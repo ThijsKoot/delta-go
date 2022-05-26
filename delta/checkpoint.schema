@@ -1,0 +1,92 @@
+message spark_schema {
+  optional group txn {
+    optional binary appId (UTF8);
+    optional int64 version;
+    optional int64 lastUpdated;
+  }
+  optional group add {
+    optional binary path (UTF8);
+    optional group partitionValues (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+    optional int64 size;
+    optional int64 modificationTime;
+    optional boolean dataChange;
+    optional group tags (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+    optional binary stats (UTF8);
+  }
+  optional group remove {
+    optional binary path (UTF8);
+    optional int64 deletionTimestamp;
+    optional boolean dataChange;
+    optional boolean extendedFileMetadata;
+    optional group partitionValues (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+    optional int64 size;
+    optional group tags (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+  }
+  optional group metaData {
+    optional binary id (UTF8);
+    optional binary name (UTF8);
+    optional binary description (UTF8);
+    optional group format {
+      optional binary provider (UTF8);
+      optional group options (MAP) {
+        repeated group key_value {
+          required binary key (UTF8);
+          optional binary value (UTF8);
+        }
+      }
+    }
+    optional binary schemaString (UTF8);
+    optional group partitionColumns (LIST) {
+      repeated group list {
+        optional binary element (UTF8);
+      }
+    }
+    optional group configuration (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+    optional int64 createdTime;
+  }
+  optional group protocol {
+    optional int32 minReaderVersion;
+    optional int32 minWriterVersion;
+  }
+  optional group cdc {
+    optional binary path (UTF8);
+    optional group partitionValues (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+    optional int64 size;
+    optional group tags (MAP) {
+      repeated group key_value {
+        required binary key (UTF8);
+        optional binary value (UTF8);
+      }
+    }
+  }
+}
