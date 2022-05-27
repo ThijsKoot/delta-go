@@ -1,13 +1,13 @@
 package delta
 
 type Schema struct {
-	Type   string
-	Fields []SchemaField
+	Type   string        `json:"type"`
+	Fields []SchemaField `json:"fields"`
 }
 
 type SchemaDataType struct {
 	Primitive *PrimitiveDataType
-	Struct    *Schema
+	Struct    *Schema `json:"struct"`
 	Array     *SchemaTypeArray
 }
 
@@ -38,21 +38,23 @@ const (
 type PrimitiveDataType string
 
 type SchemaTypeMap struct {
-	Type              string
-	KeyType           SchemaDataType
-	ValueType         SchemaDataType
-	ValueContainsNull bool
+	Type              string          `json:"type"`
+	KeyType           *SchemaDataType `json:"keyType,omitempty"`
+	ValueType         *SchemaDataType `json:"valueType,omitempty"`
+	ValueContainsNull bool            `json:"valueContainsNull,omitempty"`
 }
 
 type SchemaField struct {
 	// Name of this (possibly nested) column
-	Name string
-	Type SchemaDataType
+	Name        string            `json:"name"`
+	Type        PrimitiveDataType `json:"type"`
+	ElementType *SchemaField       `json:"elementType,omitempty"`
 	// Boolean denoting whether this field can be null
-	Nullable bool
+	Nullable bool          `json:"nullable"`
+	Fields   *[]SchemaField `json:"fields,omitempty"`
 	// A JSON map containing information about this column. Keys prefixed with Delta are reserved
 	// for the implementation.
-	Metadata map[string]Value
+	Metadata map[string]string `json:"metadata"`
 }
 
 type Value struct {
@@ -74,4 +76,3 @@ type Value struct {
 	// Represents a JSON object.
 	Object map[string]Value
 }
-

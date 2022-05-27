@@ -12,7 +12,14 @@ func main() {
 	table, err := delta.OpenTable(t)
 	check(err)
 
-	fmt.Printf("%+v\n", table)
+	_ = table
+	for _, x := range table.State.Files {
+		fmt.Println(*x.Path)
+	}
+
+	for _, x := range table.State.Tombstones {
+		fmt.Println("Tombstone:", *x.Path)
+	}
 }
 
 func check(err error) {

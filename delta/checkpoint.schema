@@ -1,92 +1,205 @@
-message spark_schema {
-  optional group txn {
-    optional binary appId (UTF8);
-    optional int64 version;
-    optional int64 lastUpdated;
-  }
-  optional group add {
-    optional binary path (UTF8);
-    optional group partitionValues (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-    optional int64 size;
-    optional int64 modificationTime;
-    optional boolean dataChange;
-    optional group tags (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-    optional binary stats (UTF8);
-  }
-  optional group remove {
-    optional binary path (UTF8);
-    optional int64 deletionTimestamp;
-    optional boolean dataChange;
-    optional boolean extendedFileMetadata;
-    optional group partitionValues (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-    optional int64 size;
-    optional group tags (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-  }
-  optional group metaData {
-    optional binary id (UTF8);
-    optional binary name (UTF8);
-    optional binary description (UTF8);
-    optional group format {
-      optional binary provider (UTF8);
-      optional group options (MAP) {
-        repeated group key_value {
-          required binary key (UTF8);
-          optional binary value (UTF8);
+{
+  "Tag": "name=spark_schema, inName=Spark_schema, repetitiontype=REQUIRED",
+  "Fields": [
+    {
+      "Tag": "name=txn, inName=Txn, repetitiontype=OPTIONAL",
+      "Fields": [
+        {
+          "Tag": "name=appId, inName=AppId, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=version, inName=Version, type=INT64, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=lastUpdated, inName=LastUpdated, type=INT64, repetitiontype=OPTIONAL"
         }
-      }
+      ]
+    },
+    {
+      "Tag": "name=add, inName=Add, repetitiontype=OPTIONAL",
+      "Fields": [
+        {
+          "Tag": "name=path, inName=Path, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=partitionValues, inName=PartitionValues, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        },
+        {
+          "Tag": "name=size, inName=Size, type=INT64, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=modificationTime, inName=ModificationTime, type=INT64, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=dataChange, inName=DataChange, type=BOOLEAN, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=tags, inName=Tags, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        },
+        {
+          "Tag": "name=stats, inName=Stats, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        }
+      ]
+    },
+    {
+      "Tag": "name=remove, inName=Remove, repetitiontype=OPTIONAL",
+      "Fields": [
+        {
+          "Tag": "name=path, inName=Path, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=deletionTimestamp, inName=DeletionTimestamp, type=INT64, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=dataChange, inName=DataChange, type=BOOLEAN, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=extendedFileMetadata, inName=ExtendedFileMetadata, type=BOOLEAN, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=partitionValues, inName=PartitionValues, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        },
+        {
+          "Tag": "name=size, inName=Size, type=INT64, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=tags, inName=Tags, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Tag": "name=metaData, inName=MetaData, repetitiontype=OPTIONAL",
+      "Fields": [
+        {
+          "Tag": "name=id, inName=Id, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=name, inName=Name, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=description, inName=Description, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=format, inName=Format, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=provider, inName=Provider, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            },
+            {
+              "Tag": "name=options, inName=Options, type=MAP, repetitiontype=OPTIONAL",
+              "Fields": [
+                {
+                  "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+                },
+                {
+                  "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Tag": "name=schemaString, inName=SchemaString, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=partitionColumns, inName=PartitionColumns, type=LIST, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=element, inName=Element, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        },
+        {
+          "Tag": "name=configuration, inName=Configuration, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        },
+        {
+          "Tag": "name=createdTime, inName=CreatedTime, type=INT64, repetitiontype=OPTIONAL"
+        }
+      ]
+    },
+    {
+      "Tag": "name=protocol, inName=Protocol, repetitiontype=OPTIONAL",
+      "Fields": [
+        {
+          "Tag": "name=minReaderVersion, inName=MinReaderVersion, type=INT32, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=minWriterVersion, inName=MinWriterVersion, type=INT32, repetitiontype=OPTIONAL"
+        }
+      ]
+    },
+    {
+      "Tag": "name=cdc, inName=Cdc, repetitiontype=OPTIONAL",
+      "Fields": [
+        {
+          "Tag": "name=path, inName=Path, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=partitionValues, inName=PartitionValues, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        },
+        {
+          "Tag": "name=size, inName=Size, type=INT64, repetitiontype=OPTIONAL"
+        },
+        {
+          "Tag": "name=tags, inName=Tags, type=MAP, repetitiontype=OPTIONAL",
+          "Fields": [
+            {
+              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
+            },
+            {
+              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
+            }
+          ]
+        }
+      ]
     }
-    optional binary schemaString (UTF8);
-    optional group partitionColumns (LIST) {
-      repeated group list {
-        optional binary element (UTF8);
-      }
-    }
-    optional group configuration (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-    optional int64 createdTime;
-  }
-  optional group protocol {
-    optional int32 minReaderVersion;
-    optional int32 minWriterVersion;
-  }
-  optional group cdc {
-    optional binary path (UTF8);
-    optional group partitionValues (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-    optional int64 size;
-    optional group tags (MAP) {
-      repeated group key_value {
-        required binary key (UTF8);
-        optional binary value (UTF8);
-      }
-    }
-  }
+  ]
 }

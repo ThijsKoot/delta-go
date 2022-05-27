@@ -80,13 +80,13 @@ func (d *DeltaConfig) GetDurationFromMetadata(metadata *DeltaTableMetaData) (tim
 		return 0, fmt.Errorf("invalid input for GetDurationFromMetadata: %s", v)
 	}
 
-	quantity, err := strconv.Atoi(words[0])
+	quantity, err := strconv.Atoi(words[1])
 	if err != nil {
 		return 0, fmt.Errorf("unable to parse int from metadata: %w", err)
 	}
 
 	var unit time.Duration
-	switch words[1] {
+	switch words[2] {
 	case "nanosecond":
 		unit = time.Nanosecond
 	case "microsecond":

@@ -14,6 +14,7 @@ func NewBackendForUri(tableUri string) (StorageBackend, error) {
 	}, nil
 }
 
+
 type StorageBackend interface {
 	// /// Create a new path by appending `path_to_join` as a new component to `path`.
 	JoinPath(path, pathToJoin string) string

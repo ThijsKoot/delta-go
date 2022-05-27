@@ -1,13 +1,12 @@
 package delta
 
 import (
-	"bytes"
 	"fmt"
 
 	_ "embed"
 
-	goparquet "github.com/fraugster/parquet-go"
-	"github.com/fraugster/parquet-go/floor/interfaces"
+	"github.com/xitongsys/parquet-go-source/buffer"
+	"github.com/xitongsys/parquet-go/reader"
 )
 
 var (
@@ -50,7 +49,7 @@ func NewDeltaTableStateFromActions(actions []Action) (*DeltaTableState, error) {
 }
 
 type record struct {
-	SparkSchema Action `parquet:"name=Spark_schema, repetitiontype=REQUIRED"`
+	SparkSchema Action `parquet:"spark_schema"`
 }
 
 func NewDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint) (*DeltaTableState, error) {
@@ -63,96 +62,36 @@ func NewDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint)
 			return nil, fmt.Errorf("unable to get checkpoint data: %w", err)
 		}
 
-		reader, err := goparquet.NewFileReader(bytes.NewReader(data))
+		pf := buffer.NewBufferFileFromBytes(data)
+		pr, err := reader.NewParquetReader(pf, checkpointSchema, 1)
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("unable to create parquet reader: %w", err)
 		}
 
-		row, err := reader.NextRow()
-		if err != nil {
-			panic(err)
+		num := int(pr.GetNumRows())
+		actions := make([]Action, num)
+		if err = pr.Read(&actions); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal Action from parquet row: %w", err)
 		}
-		fmt.Printf("%+v\n", row)
 
-		// hlReader := floor.NewReader(reader)
-		// records := make([]Spark_schema, reader.NumRows())
-		// for i := 0; i < int(reader.NumRows()); i++ {
-		// 	hlReader.Next()
-		// 	var record Spark_schema
-		// 	if err := hlReader.Scan(&record); err != nil {
-		// 		panic(err)
-		// 	}
-		// 	records[i] = record
-		// 	fmt.Printf("%+v\n", record)
-		//
-		// }
-		// for hlReader.Next() {
-		// records = append(records, record)
-		// }
-
+		for _, a := range actions {
+			if err := state.ProcessAction(a, table.Config.RequireTombstones, table.Config.RequireFiles); err != nil {
+				return nil, fmt.Errorf("unable to process action: %w", err)
+			}
+		}
 	}
 	return state, nil
 }
 
-func (a *Action) MarshalParquet(obj interfaces.MarshalObject) error {
-	obj.AddField("path")
-
-}
-
-// func NewDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint) (*DeltaTableState, error) {
-// 	checkPointDataPaths := table.GetCheckPointDataPaths(checkPoint)
-//
-// 	state := NewDeltaTableState()
-// 	for _, p := range checkPointDataPaths {
-// 		data, err := table.Storage.GetObj(p)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("unable to get checkpoint data: %w", err)
-// 		}
-//
-// 		// pf, err := buffer.NewBufferFileFromBytes()
-// 		pf := buffer.NewBufferFileFromBytes(data)
-// 		// var a source.ParquetFile
-// 		// _ = a
-//
-// 		// r, _ := reader.NewParquetColumnReader(pf, 4)
-//
-// 		// r.SetSchemaHandlerFromJSON(checkpointSchema)
-//
-// 		pr, err := reader.NewParquetReader(pf, new(Spark_schema), 4)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("unable to create parquet reader: %w", err)
-// 		}
-// 		fmt.Println(pr.Footer.String())
-//
-// 		num := int(pr.GetNumRows())
-// 		// println(num)
-// 		actions := make([]Action, num)
-// 		records := make([]Spark_schema, num)
-// 		// if err = pr.Read(&records); err != nil {
-// 		rows, err := pr.ReadByNumber(1)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 		for _, r := range rows {
-// 			fmt.Printf("%+v\n", r)
-// 		}
-// 		if err = pr.Read(&records); err != nil {
-// 			return nil, fmt.Errorf("unable to unmarshal Action from parquet row: %w", err)
-// 		}
-// 		_ = actions
-// 		for _, a := range records {
-// 			panic(a)
-// 			// state.ProcessAction(a.Spark_schema, table.Config.RequireTombstones, table.Config.RequireFiles)
-// 		}
-// 	}
-// 	return state, nil
-// }
-
 func (state *DeltaTableState) Merge(newState *DeltaTableState, requireTombstones, requireFiles bool) {
 	// remove deleted files from new state
+	// fmt.Println(len(newState.Tombstones))
+	// fmt.Println(len(newState.Files))
+	// fmt.Println(len(newState.CommitInfos))
 	if len(newState.Tombstones) > 0 {
 		newFiles := make([]Add, 0, len(state.Files))
 		for _, add := range state.Files {
+
 			if _, isDeleted := newState.Tombstones[*add.Path]; !isDeleted {
 				newFiles = append(newFiles, add)
 			}
@@ -216,10 +155,10 @@ func (state *DeltaTableState) ProcessAction(action Action, requireTombstones, re
 		}
 
 	case ActionTypeProtocol:
-		state.MinReaderVersion = action.Protocol.MinReaderVersion
-		state.MinWriterVersion = action.Protocol.MinWriterVersion
+		state.MinReaderVersion = *action.Protocol.MinReaderVersion
+		state.MinWriterVersion = *action.Protocol.MinWriterVersion
 	case ActionTypeMetadata:
-		md, err := action.Metadata.TryConvertToDeltaTableMetaData()
+		md, err := action.MetaData.TryConvertToDeltaTableMetaData()
 		if err != nil {
 			return fmt.Errorf("unable to convert action metadata: %w", err)
 		}
@@ -242,7 +181,7 @@ func (state *DeltaTableState) ProcessAction(action Action, requireTombstones, re
 
 		state.CurrentMetadata = md
 	case ActionTypeTxn:
-		state.AppTransactionVersion[*action.Txn.AppId] = action.Txn.Version
+		state.AppTransactionVersion[*action.Txn.AppId] = *action.Txn.Version
 	case ActionTypeCommitInfo:
 		state.CommitInfos = append(state.CommitInfos, state.CommitInfos...)
 	}

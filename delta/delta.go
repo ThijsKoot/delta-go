@@ -77,15 +77,15 @@ type CheckPoint struct {
 
 type DeltaTableMetaData struct {
 	/// Unique identifier for this table
-	Id string
+	Id *string
 	/// User-provided identifier for this table
 	Name *string
 	/// User-provided description for this table
-	Description string
+	Description *string
 	/// Specification of the encoding for the files stored in the table
-	Format Format
+	Format *Format
 	/// Schema of the table
-	Schema Schema
+	Schema *Schema
 	/// An array containing the names of columns by which the data should be partitioned
 	PartitionColumns []string
 	/// The time when this metadata action is created, in milliseconds since the Unix epoch
@@ -290,7 +290,7 @@ func (d *DeltaTable) Update() error {
 		return fmt.Errorf("unable to update: %w", err)
 	}
 
-	if cp.Equal(d.LastCheckPoint) {
+	if cp == nil || cp.Equal(d.LastCheckPoint) {
 		return d.UpdateIncremental()
 	} else {
 		d.LastCheckPoint = cp
@@ -314,17 +314,22 @@ func (d *DeltaTable) RestoreCheckPoint(checkpoint *CheckPoint) error {
 /// Updates the DeltaTable to the latest version by incrementally applying newer versions.
 /// It assumes that the table is already updated to the current version `self.version`.
 func (d *DeltaTable) UpdateIncremental() error {
-	peekCommit, err := d.PeekNextCommit(d.Version)
-	if err != nil {
-		return fmt.Errorf("unable to peek next commit: %w", err)
-	}
+	for {
+		peekCommit, err := d.PeekNextCommit(d.Version)
+		if err != nil {
+			return fmt.Errorf("unable to peek next commit: %w", err)
+		}
+		if peekCommit.UpToDate {
+			break
+		}
 
-	if !peekCommit.UpToDate {
-		d.ApplyActions(peekCommit.New.Version, peekCommit.New.Actions)
-	}
+		if !peekCommit.UpToDate {
+			d.ApplyActions(peekCommit.New.Version, peekCommit.New.Actions)
+		}
 
-	if d.Version == -1 {
-		return fmt.Errorf("no snapshot or version 0 found, perhaps %s is an empty dir", d.TableUri)
+		if d.Version == -1 {
+			return fmt.Errorf("no snapshot or version 0 found, perhaps %s is an empty dir", d.TableUri)
+		}
 	}
 
 	return nil
@@ -348,7 +353,6 @@ func (d *DeltaTable) PeekNextCommit(currentVersion DeltaDataTypeVersion) (*PeekC
 	for {
 		var a Action
 
-		// FIXME: add action struct tags
 		err := dec.Decode(&a)
 		if err == io.EOF {
 			// all done
@@ -394,10 +398,14 @@ func (d *DeltaTable) CommitUriFromVersion(version DeltaDataTypeVersion) string {
 
 func (d *DeltaTable) GetLastCheckpoint() (*CheckPoint, error) {
 	lastCheckpointPath := d.Storage.JoinPath(d.LogUri, "_last_checkpoint")
+	// FIXME: return custom not found error
 	data, err := d.Storage.GetObj(lastCheckpointPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get last checkpoint: %w", err)
+		return nil, nil
 	}
+	// if err != nil {
+	// 	return nil, fmt.Errorf("unable to get last checkpoint: %w", err)
+	// }
 
 	var cp CheckPoint
 	if err := json.Unmarshal(data, &cp); err != nil {
