@@ -1,7 +1,5 @@
 package schema
 
-import "github.com/apache/arrow/go/arrow"
-
 type DataType string
 
 const (
@@ -22,6 +20,17 @@ const (
 )
 
 type Schema = SchemaTypeStruct
+
+type SchemaField struct {
+	// Name of this (possibly nested) column
+	Name string
+	Type SchemaDataType
+	// Boolean denoting whether this field can be null
+	Nullable bool `json:"nullable"`
+	// A JSON map containing information about this column. Keys prefixed with Delta are reserved
+	// for the implementation.
+	Metadata map[string]string `json:"metadata"`
+}
 
 type SchemaDataType struct {
 	Primitive *DataType
@@ -50,17 +59,6 @@ type SchemaTypeArray struct {
 	ElementType SchemaDataType
 	// Boolean denoting whether this array can contain one or more null values
 	ContainsNull bool
-}
-
-type SchemaField struct {
-	// Name of this (possibly nested) column
-	Name string
-	Type SchemaDataType
-	// Boolean denoting whether this field can be null
-	Nullable bool `json:"nullable"`
-	// A JSON map containing information about this column. Keys prefixed with Delta are reserved
-	// for the implementation.
-	Metadata map[string]string `json:"metadata"`
 }
 
 func NewPrimitiveType(dataType DataType) SchemaDataType {
@@ -100,20 +98,3 @@ func NewArrayType(elementType SchemaDataType, containsNull bool) SchemaDataType 
 	}
 }
 
-func (s *Schema) ToArrowSchema() arrow.Schema {
-	for _, f := range s.Fields {
-		arrow.StructOf()
-		af := arrow.Field{
-			Name: f.Name,
-			Type: &arrow.StructType{},
-		}
-		_ = af
-
-		af = arrow.Field{
-			Name: f.Name,
-			Type: &arrow.StringType{},
-		}
-
-	}
-	return arrow.Schema{}
-}
