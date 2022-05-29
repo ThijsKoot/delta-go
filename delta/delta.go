@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thijskoot/delta-go/delta/schema"
 	"github.com/thijskoot/delta-go/storage"
 )
 
@@ -85,7 +86,7 @@ type DeltaTableMetaData struct {
 	/// Specification of the encoding for the files stored in the table
 	Format *Format
 	/// Schema of the table
-	Schema *Schema
+	Schema *schema.Schema
 	/// An array containing the names of columns by which the data should be partitioned
 	PartitionColumns []string
 	/// The time when this metadata action is created, in milliseconds since the Unix epoch

@@ -1,6 +1,7 @@
 package delta
 
 import (
+	"encoding/json"
 	"fmt"
 
 	_ "embed"
@@ -19,7 +20,7 @@ type DeltaTableState struct {
 	// A tombstone expires when the creation timestamp of the delta file exceeds the expiration
 	Tombstones               map[string]Remove // HashSet<action::Remove>
 	Files                    []Add
-	CommitInfos              []map[string]Value
+	CommitInfos              []map[string]json.RawMessage
 	AppTransactionVersion    map[string]DeltaDataTypeVersion
 	MinReaderVersion         int32
 	MinWriterVersion         int32
@@ -33,7 +34,7 @@ func NewDeltaTableState() *DeltaTableState {
 	return &DeltaTableState{
 		Tombstones:            make(map[string]Remove),
 		Files:                 make([]Add, 0),
-		CommitInfos:           make([]map[string]Value, 0),
+		CommitInfos:           make([]map[string]json.RawMessage, 0),
 		AppTransactionVersion: make(map[string]int64),
 	}
 }

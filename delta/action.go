@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+
+	"github.com/thijskoot/delta-go/delta/schema"
 )
 
 // Represents an action in the Delta log. The Delta log is an aggregate of all actions performed
@@ -146,7 +148,7 @@ type ColumnValueStat struct {
 	// Composite HashMap representation of statistics.
 	Column map[string]ColumnValueStat
 	// Json representation of statistics.
-	Value Value
+	Value json.RawMessage
 }
 
 type ColumnCountStat struct {
@@ -368,8 +370,8 @@ func (m *Metadata) TryConvertToDeltaTableMetaData() (*DeltaTableMetaData, error)
 	}, nil
 }
 
-func (m *Metadata) GetSchema() (*Schema, error) {
-	var s Schema
+func (m *Metadata) GetSchema() (*schema.Schema, error) {
+	var s schema.Schema
 	if err := json.Unmarshal([]byte(*m.SchemaString), &s); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal schema: %w", err)
 	}
