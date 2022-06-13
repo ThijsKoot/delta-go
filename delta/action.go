@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/thijskoot/delta-go/delta/schema"
+	"github.com/thijskoot/delta-go/util"
 )
 
 // Represents an action in the Delta log. The Delta log is an aggregate of all actions performed
@@ -23,9 +24,9 @@ type Action struct {
 	MetaData *Metadata `json:"metaData,omitempty" parquet:"MetaData"`
 	// Describes the minimum reader and writer versions required to read or write to the table.
 	Protocol *Protocol `json:"protocol,omitempty" parquet:"Protocol"`
-	// // Describes commit provenance information for the table.
-	// CommitInfo *CommitInfo `json:"commitInfo,omitempty" parquet:"commitInfo"`
-	Cdc *Cdc `parquet:"Cdc"`
+	// Describes commit provenance information for the table.
+	CommitInfo *util.RawJsonMap `json:"commitInfo,omitempty" parquet:"CommitInfo"`
+	Cdc        *Cdc                        `parquet:"Cdc"`
 }
 
 // Action used by streaming systems to track progress using application-specific versions to
@@ -130,7 +131,7 @@ type Protocol struct {
 	MinWriterVersion *DeltaTableTypeInt `json:"minWriterVersion" parquet:"MinWriterVersion"`
 }
 
-type Cdc *struct {
+type Cdc struct {
 	Path            *string             `parquet:"Path"`
 	PartitionValues *map[string]*string `parquet:"PartitionValues"`
 	Size            *int64              `parquet:"Size"`
@@ -212,9 +213,9 @@ func (a *Action) GetType() ActionType {
 	if a.Protocol != nil {
 		return ActionTypeProtocol
 	}
-	// if a.CommitInfo != nil {
-	// 	return ActionTypeCommitInfo
-	// }
+	if a.CommitInfo != nil {
+		return ActionTypeCommitInfo
+	}
 	return ActionTypeInvalid
 }
 
@@ -245,69 +246,94 @@ type Notebook struct {
 	NotebookId *string `json:"notebookId" parquet:"notebookId"`
 }
 
-/// Operation performed when creating a new log entry with one or more actions.
-/// This is a key element of the `CommitInfo` action.
+// Operation performed when creating a new log entry with one or more actions.
+// This is a key element of the `CommitInfo` action.
 type DeltaOperation struct {
-	/// Represents a Delta `Create` operation.
-	/// Would usually only create the table, if also data is written,
-	/// a `Write` operations is more appropriate
-	Create struct {
-		/// The save mode used during the create.
+	// Represents a Delta `Create` operation.
+	// Would usually only create the table, if also data is written,
+	// a `Write` operations is more appropriate
+	Create *struct {
+		// The save mode used during the create.
 		Mode SaveMode
-		/// The storage location of the new table
+		// The storage location of the new table
 		Location string
-		/// The min reader and writer protocol versions of the table
+		// The min reader and writer protocol versions of the table
 		Protocol Protocol
-		/// Metadata associated with the new table
+		// Metadata associated with the new table
 		Metadata DeltaTableMetaData
 	}
 
-	/// Represents a Delta `Write` operation.
-	/// Write operations will typically only include `Add` actions.
-	Write struct {
-		/// The save mode used during the write.
+	// Represents a Delta `Write` operation.
+	// Write operations will typically only include `Add` actions.
+	Write *struct {
+		// The save mode used during the write.
 		Mode SaveMode
-		/// The columns the write is partitioned by.
+		// The columns the write is partitioned by.
 		PartitionBy *[]string
-		/// The predicate used during the write.
+		// The predicate used during the write.
 		Predicate *string
 	}
 
-	/// Represents a Delta `StreamingUpdate` operation.
-	StreamingUpdate struct {
-		/// The output mode the streaming writer is using.
+	// Represents a Delta `StreamingUpdate` operation.
+	StreamingUpdate *struct {
+		// The output mode the streaming writer is using.
 		OutputMode OutputMode
-		/// The query id of the streaming writer.
+		// The query id of the streaming writer.
 		QueryId string
-		/// The epoch id of the written micro-batch.
+		// The epoch id of the written micro-batch.
 		EpochId int64
 	}
 	// TODO: Add more operations
 }
 
-/// The SaveMode used when performing a DeltaOperation
+func (op *DeltaOperation) GetCommitInfo() util.RawJsonMap {
+	commitInfo := make(util.RawJsonMap)
+	var opType string
+	if op.Create != nil {
+		opType = "delta-go.Create"
+	}
+	if op.Write != nil {
+		opType = "delta-go.Write"
+	}
+	if op.StreamingUpdate != nil {
+		opType = "delta-go.StreamingUpdate"
+	}
+
+	commitInfo.MustUpsert("operation", opType)
+
+	// TODO:
+	// if let Ok(serde_json::Value::Object(map)) = serde_json::to_value(self) {
+	// 	commit_info.insert(
+	// 		"operationParameters".to_string(),
+	// 		map.values().next().unwrap().clone(),
+	// 	);
+	// };
+	return commitInfo
+}
+
+// The SaveMode used when performing a DeltaOperation
 type SaveMode int
 
 const (
-	/// Files will be appended to the target location.
+	// Files will be appended to the target location.
 	SaveModeAppend SaveMode = iota
-	/// The target location will be overwritten.
+	// The target location will be overwritten.
 	SaveModeOverwrite
-	/// If files exist for the target, the operation must fail.
+	// If files exist for the target, the operation must fail.
 	SaveModeErrorIfExists
-	/// If files exist for the target, the operation must not proceed or change any data.
+	// If files exist for the target, the operation must not proceed or change any data.
 	SaveModeIgnore
 )
 
-/// The OutputMode used in streaming operations.
+// The OutputMode used in streaming operations.
 type OutputMode int
 
 const (
-	/// Only new rows will be written when new data is available.
+	// Only new rows will be written when new data is available.
 	OutputModeAppend OutputMode = iota
-	/// The full output (all rows) will be written whenever new data is available.
+	// The full output (all rows) will be written whenever new data is available.
 	OutputModeComplete
-	/// Only rows with updates will be written when new or changed data is available.
+	// Only rows with updates will be written when new or changed data is available.
 	OutputModeUpdate
 )
 

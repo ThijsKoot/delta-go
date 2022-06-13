@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go/writer"
 )
 
 func main() {
@@ -17,9 +19,17 @@ func main() {
 		fmt.Println(*x.Path)
 	}
 
-	for _, x := range table.State.Tombstones {
-		fmt.Println("Tombstone:", *x.Path)
-	}
+	fmt.Println(table.Version)
+
+	jsonWriter, err := writer.NewJsonWriterForTable(table)
+	check(err)
+
+	records := []json.RawMessage{[]byte(`{"id": 10000}`)}
+	err = jsonWriter.Write(records)
+	check(err)
+	ver, err := jsonWriter.FlushAndCommit(*table)
+	check(err)
+	println(ver)
 }
 
 func check(err error) {

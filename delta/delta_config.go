@@ -29,11 +29,11 @@ var (
 	}
 )
 
-/// Delta table's `metadata.configuration` entry.
+// Delta table's `metadata.configuration` entry.
 type DeltaConfig struct {
-	/// The configuration name
+	// The configuration name
 	Key string
-	/// The default value if `key` is not set in `metadata.configuration`.
+	// The default value if `key` is not set in `metadata.configuration`.
 	Default string
 }
 
