@@ -167,39 +167,6 @@
           "Tag": "name=minWriterVersion, inName=MinWriterVersion, type=INT32, repetitiontype=OPTIONAL"
         }
       ]
-    },
-    {
-      "Tag": "name=cdc, inName=Cdc, repetitiontype=OPTIONAL",
-      "Fields": [
-        {
-          "Tag": "name=path, inName=Path, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
-        },
-        {
-          "Tag": "name=partitionValues, inName=PartitionValues, type=MAP, repetitiontype=OPTIONAL",
-          "Fields": [
-            {
-              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
-            },
-            {
-              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
-            }
-          ]
-        },
-        {
-          "Tag": "name=size, inName=Size, type=INT64, repetitiontype=OPTIONAL"
-        },
-        {
-          "Tag": "name=tags, inName=Tags, type=MAP, repetitiontype=OPTIONAL",
-          "Fields": [
-            {
-              "Tag": "name=key, inName=Key, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"
-            },
-            {
-              "Tag": "name=value, inName=Value, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"
-            }
-          ]
-        }
-      ]
     }
   ]
 }

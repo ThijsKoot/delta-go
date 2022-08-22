@@ -26,7 +26,7 @@ type Action struct {
 	Protocol *Protocol `json:"protocol,omitempty" parquet:"Protocol"`
 	// Describes commit provenance information for the table.
 	CommitInfo *util.RawJsonMap `json:"commitInfo,omitempty" parquet:"CommitInfo"`
-	Cdc        *Cdc                        `parquet:"Cdc"`
+	// Cdc        *Cdc                        `parquet:"Cdc"`
 }
 
 // Action used by streaming systems to track progress using application-specific versions to
