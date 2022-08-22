@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/apache/arrow/go/v8/arrow"
-	"github.com/apache/arrow/go/v8/arrow/array"
-	"github.com/apache/arrow/go/v8/arrow/memory"
-	"github.com/apache/arrow/go/v8/parquet"
-	"github.com/apache/arrow/go/v8/parquet/pqarrow"
+	"github.com/apache/arrow/go/v9/arrow"
+	"github.com/apache/arrow/go/v9/arrow/array"
+	"github.com/apache/arrow/go/v9/arrow/memory"
+	"github.com/apache/arrow/go/v9/parquet"
+	"github.com/apache/arrow/go/v9/parquet/pqarrow"
 	"github.com/thijskoot/delta-go/delta"
 	"github.com/thijskoot/delta-go/storage"
 )
@@ -145,8 +145,8 @@ func extractPartitionValues(partitionColumns []string, rec arrow.Record) (map[st
 
 		partitionValues[c] = partitionString
 	}
-	return partitionValues, nil
 
+	return partitionValues, nil
 }
 
 func stringifiedPartitionValue(arr arrow.Array) (*string, error) {

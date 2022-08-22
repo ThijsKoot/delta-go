@@ -3,7 +3,7 @@ package schema
 import (
 	"fmt"
 
-	"github.com/apache/arrow/go/v8/arrow"
+	"github.com/apache/arrow/go/v9/arrow"
 )
 
 func (sdt *SchemaDataType) AsArrowType() arrow.DataType {

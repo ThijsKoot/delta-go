@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/apache/arrow/go/v8/arrow"
+	"github.com/apache/arrow/go/v9/arrow"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/thijskoot/delta-go/delta"
 	"github.com/thijskoot/delta-go/storage"
@@ -91,13 +91,6 @@ func (w *JsonWriter) FlushAndCommit(table delta.DeltaTable) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	// actions := make([]delta.Action, len(adds))
-	// for i := range adds {
-	// 	action := delta.Action{
-	// 		Add: &adds[i],
-	// 	}
-	// 	actions = append(actions, adds...)
-	// }
 
 	tx := table.CreateTransaction(nil)
 	tx.AddActions(adds)
