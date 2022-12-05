@@ -20,7 +20,7 @@ type rawSchemaField struct {
 	Fields   *[]rawSchemaField `json:"fields,omitempty"`
 	// A JSON map containing information about this column. Keys prefixed with Delta are reserved
 	// for the implementation.
-	Metadata *map[string]string `json:"metadata,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 
 	KeyType   *json.RawMessage `json:"keyType,omitempty"`
 	ValueType *json.RawMessage `json:"valueType,omitempty"`
@@ -39,7 +39,7 @@ func (r *rawSchemaField) asSchemaField() (SchemaField, error) {
 	result := SchemaField{
 		Name:     *r.Name,
 		Nullable: *r.Nullable,
-		Metadata: *r.Metadata,
+		Metadata: r.Metadata,
 		Type:     dt,
 	}
 
@@ -49,7 +49,7 @@ func (r *rawSchemaField) asSchemaField() (SchemaField, error) {
 func (s *SchemaField) asRawSchemaField() (rawSchemaField, error) {
 	result := rawSchemaField{
 		Name:     &s.Name,
-		Metadata: &s.Metadata,
+		Metadata: s.Metadata,
 		Nullable: &s.Nullable,
 		// Type: ,
 	}
@@ -79,7 +79,7 @@ func (s *Schema) MarshalJSON() ([]byte, error) {
 
 		if rf.Metadata == nil {
 			md := make(map[string]string)
-			rf.Metadata = &md
+			rf.Metadata = md
 		}
 
 		raw.Fields[i] = rf
@@ -148,7 +148,7 @@ func (sdt *SchemaDataType) UnmarshalJSON(data []byte) error {
 				Name:     *rf.Name,
 				Type:     fieldType,
 				Nullable: *rf.Nullable,
-				Metadata: *rf.Metadata,
+				Metadata: rf.Metadata,
 			}
 			fields[i] = f
 		}

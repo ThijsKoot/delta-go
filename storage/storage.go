@@ -1,25 +1,26 @@
 package storage
 
 import (
-	"strings"
+	"fmt"
 	"time"
+
+	"gocloud.dev/blob"
 )
 
-func NewBackendForUri(tableUri string) (StorageBackend, error) {
-	if strings.Contains(tableUri, "://") {
-		panic("Not implemented")
+func NewBackend(bucket *blob.Bucket) (StorageBackend, error) {
+	if bucket == nil {
+		return nil, fmt.Errorf("bucket cannnot be nil")
 	}
-	return &FileStorageBackend{
-		Root: tableUri,
+
+	return &BlobBackend{
+		bucket: bucket,
 	}, nil
 }
 
 type StorageBackend interface {
-	// // Create a new path by appending `path_to_join` as a new component to `path`.
-	JoinPath(path, pathToJoin string) string
 	// More efficient path join for multiple path components. Use this method if you need to
 	// combine more than two path components.
-	JoinPaths(path string, paths []string) string
+	JoinPaths(path string, paths ...string) string
 	// Returns trimed path with trailing path separator removed.
 	TrimPath(path string) string
 	// Fetch object metadata without reading the actual content
@@ -47,10 +48,8 @@ type StorageBackend interface {
 	// In other words, if the destination path already exists, rename should return a
 	// [StorageError::AlreadyExists] error.
 	RenameObjNoReplace(src, dst string) error
-	// Deletes object by `path`.
-	DeleteObj(path string) error
 	// Deletes object by `paths`.
-	DeleteObjs(paths []string) error
+	DeleteObjs(paths ...string) error
 }
 
 // Describes metadata of a storage object.

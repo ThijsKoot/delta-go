@@ -1,11 +1,13 @@
 package writer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/apache/arrow/go/v9/arrow"
+	"github.com/apache/arrow/go/v9/parquet/file"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/thijskoot/delta-go/delta"
 	"github.com/thijskoot/delta-go/storage"
@@ -22,14 +24,10 @@ type JsonWriter struct {
 	WriterProperties WriterProperties
 	PartitionColumns []string
 	ArrowWriters     map[string]DataArrowWriter
+	Table            *delta.DeltaTable
 }
 
 func NewJsonWriterForTable(table *delta.DeltaTable) (*JsonWriter, error) {
-	storage, err := storage.NewBackendForUri(table.TableUri)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create storage backend for json writer: %w", err)
-	}
-
 	meta := table.State.CurrentMetadata
 	if meta == nil {
 		return nil, fmt.Errorf("table has no current metadata")
@@ -39,11 +37,12 @@ func NewJsonWriterForTable(table *delta.DeltaTable) (*JsonWriter, error) {
 	partitionCols := meta.PartitionColumns
 
 	return &JsonWriter{
-		Storage:          storage,
+		Storage:          table.Storage,
 		TableUri:         table.TableUri,
 		ArrowSchema:      *arrowSchema,
 		PartitionColumns: partitionCols,
 		ArrowWriters:     make(map[string]DataArrowWriter),
+		Table:            table,
 	}, nil
 }
 
@@ -62,8 +61,14 @@ func (w *JsonWriter) Flush() ([]delta.Action, error) {
 
 		data := writer.Buffer.Bytes()
 		size := len(data)
-		storagePath := w.Storage.JoinPath(w.TableUri, path)
+		storagePath := w.Storage.JoinPaths(w.TableUri, path)
 
+		preader, err := file.NewParquetReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("unable to open parquet buffer for stats extraction: %w", err)
+		}
+		meta := preader.MetaData()
+		
 		if err := w.Storage.PutObj(storagePath, data); err != nil {
 			return nil, fmt.Errorf("unable to put data: %w", err)
 		}
@@ -74,7 +79,7 @@ func (w *JsonWriter) Flush() ([]delta.Action, error) {
 		//
 		// }
 
-		add, err := CreateAdd(writer.PartitionValues, NullCounts{}, path, int64(size))
+		add, err := createAdd(writer.PartitionValues, writer.NullCounts, path, int64(size), meta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create Add action: %w", err)
 		}
@@ -86,13 +91,13 @@ func (w *JsonWriter) Flush() ([]delta.Action, error) {
 }
 
 // FlushAndCommit implements DeltaWriter
-func (w *JsonWriter) FlushAndCommit(table delta.DeltaTable) (int64, error) {
+func (w *JsonWriter) FlushAndCommit() (int64, error) {
 	adds, err := w.Flush()
 	if err != nil {
 		return 0, err
 	}
 
-	tx := table.CreateTransaction(nil)
+	tx := w.Table.CreateTransaction(nil)
 	tx.AddActions(adds)
 	version, err := tx.Commit(nil, nil)
 	if err != nil {
@@ -157,9 +162,3 @@ func (w *JsonWriter) jsonToPartitionValues(value json.RawMessage) (string, error
 
 	return strings.Join(values, "/"), nil
 }
-
-//
-// type action interface {
-// 	delta.Add | delta.Protocol | delta.Metadata | delta.Txn | delta.Cdc | delta.Remove
-// }
-//

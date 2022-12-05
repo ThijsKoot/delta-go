@@ -15,14 +15,10 @@ import (
 	"github.com/thijskoot/delta-go/storage"
 )
 
-type Writeable interface {
-	[]json.RawMessage
-}
-
-type DeltaWriter[T Writeable] interface {
+type DeltaWriter[T any] interface {
 	Write(values T) error
 	Flush() ([]delta.Action, error)
-	FlushAndCommit(table delta.DeltaTable) (delta.DeltaDataTypeVersion, error)
+	FlushAndCommit() (delta.DeltaDataTypeVersion, error)
 }
 
 type DataWriter struct {
@@ -40,7 +36,7 @@ type DataArrowWriter struct {
 	ArrowSchema      arrow.Schema
 	WriterProperties WriterProperties
 	PartitionValues  map[string]*string
-	NullCounts       map[string]delta.ColumnValueStat
+	NullCounts       map[string]delta.ColumnCountStat
 	ParquetWriter    *pqarrow.FileWriter
 
 	Buffer *bytes.Buffer
@@ -62,7 +58,7 @@ func NewDataArrowWriter(schema arrow.Schema, writerProperties WriterProperties) 
 		ArrowSchema:              schema,
 		WriterProperties:         writerProperties,
 		PartitionValues:          make(map[string]*string),
-		NullCounts:               make(map[string]delta.ColumnValueStat),
+		NullCounts:               make(map[string]delta.ColumnCountStat),
 		ParquetWriter:            writer,
 		Buffer:                   &buf,
 		BufferedRecordBatchCount: 0,
@@ -111,9 +107,14 @@ func (w *DataArrowWriter) WriteRecord(partitionColumns []string, rec arrow.Recor
 		w.PartitionValues = partitionValues
 	}
 
+	// copy current buffer to enable failrure recovery
+	var bufferBytes []byte
+	copy(bufferBytes, w.Buffer.Bytes())
+
 	if err := w.ParquetWriter.Write(rec); err != nil {
-		// reset ParquetWriter if write fails
-		w.Buffer.Reset()
+		// reset State of DataArrowWriter if write fails
+		w.Buffer = bytes.NewBuffer(bufferBytes)
+
 		writer, err := newParquetWriter(&w.ArrowSchema, w.Buffer, parquet.NewWriterProperties(), pqarrow.DefaultWriterProps())
 		if err != nil {
 			return fmt.Errorf("unable to create new parquetwriter: %w", err)
@@ -123,8 +124,9 @@ func (w *DataArrowWriter) WriteRecord(partitionColumns []string, rec arrow.Recor
 	}
 
 	w.BufferedRecordBatchCount += 1
-	// TODO: not implemented yet
-	// apply_null_counts(&record_batch.into(), &mut self.null_counts, 0);
+
+	applyNullCounts(array.RecordToStructArray(rec), w.NullCounts, 0)
+
 	return nil
 }
 

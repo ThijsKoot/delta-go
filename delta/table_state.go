@@ -53,7 +53,7 @@ type record struct {
 	SparkSchema Action `parquet:"spark_schema"`
 }
 
-func NewDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint) (*DeltaTableState, error) {
+func newDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint) (*DeltaTableState, error) {
 	checkPointDataPaths := table.GetCheckPointDataPaths(checkPoint)
 
 	state := NewDeltaTableState()
@@ -93,7 +93,7 @@ func (state *DeltaTableState) Merge(newState *DeltaTableState, requireTombstones
 		newFiles := make([]Add, 0, len(state.Files))
 		for _, add := range state.Files {
 
-			if _, isDeleted := newState.Tombstones[*add.Path]; !isDeleted {
+			if _, isDeleted := newState.Tombstones[add.Path]; !isDeleted {
 				newFiles = append(newFiles, add)
 			}
 		}
@@ -107,7 +107,7 @@ func (state *DeltaTableState) Merge(newState *DeltaTableState, requireTombstones
 
 		if len(newState.Files) > 0 {
 			for _, add := range newState.Files {
-				delete(state.Tombstones, *add.Path)
+				delete(state.Tombstones, add.Path)
 			}
 		}
 	}
@@ -152,12 +152,12 @@ func (state *DeltaTableState) ProcessAction(action Action, requireTombstones, re
 			if err := action.Remove.PathDecoded(); err != nil {
 				return err
 			}
-			state.Tombstones[*action.Remove.Path] = *action.Remove
+			state.Tombstones[action.Remove.Path] = *action.Remove
 		}
 
 	case ActionTypeProtocol:
-		state.MinReaderVersion = *action.Protocol.MinReaderVersion
-		state.MinWriterVersion = *action.Protocol.MinWriterVersion
+		state.MinReaderVersion = action.Protocol.MinReaderVersion
+		state.MinWriterVersion = action.Protocol.MinWriterVersion
 	case ActionTypeMetadata:
 		md, err := action.MetaData.TryConvertToDeltaTableMetaData()
 		if err != nil {

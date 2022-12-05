@@ -1,8 +1,10 @@
 package delta
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/thijskoot/delta-go/delta/schema"
@@ -43,11 +45,11 @@ type Txn struct {
 // Delta log action that describes a parquet data file that is part of the table.
 type Add struct {
 	// A relative path, from the root of the table, to a file that should be added to the table
-	Path *string `json:"path" parquet:"Path"`
+	Path string `json:"path" parquet:"Path"`
 	// A map from partition column to value for this file
-	PartitionValues *map[string]*string `json:"partitionValues" parquet:"PartitionValues"`
+	PartitionValues map[string]*string `json:"partitionValues" parquet:"PartitionValues"`
 	// The size of this file in bytes
-	Size *DeltaDataTypeLong `json:"size" parquet:"Size"`
+	Size DeltaDataTypeLong `json:"size" parquet:"Size"`
 	// Partition values stored in raw parquet struct format. In this struct, the column names
 	// correspond to the partition columns and the values are stored in their corresponding data
 	// type. This is a required field when the table is partitioned and the table property
@@ -57,13 +59,13 @@ type Add struct {
 	// This field is only available in add action records read from checkpoints
 	// PartitionValuesParsed map[string]string `json:"partitionValuesParsed" parquet:"partitionValuesParsed"` // Option<parquet::record::Row>
 	// The time this file was created, as milliseconds since the epoch
-	ModificationTime *DeltaDataTypeTimestamp `json:"modificationTime" parquet:"ModificationTime"`
+	ModificationTime DeltaDataTypeTimestamp `json:"modificationTime" parquet:"ModificationTime"`
 	// When false the file must already be present in the table or the records in the added file
 	// must be contained in one or more remove actions in the same version
 	//
 	// streaming queries that are tailing the transaction log can use this flag to skip actions
 	// that would not affect the final results.
-	DataChange *bool `json:"dataChange" parquet:"DataChange"`
+	DataChange bool `json:"dataChange" parquet:"DataChange"`
 	// Contains statistics (e.g., count, min/max values for columns) about the data in this file in
 	// raw parquet format. This field needs to be written when statistics are available and the
 	// table property: delta.checkpoint.writeStatsAsStruct is set to true.
@@ -71,7 +73,7 @@ type Add struct {
 	// This field is only available in add action records read from checkpoints
 	// StatsParsed []byte `json:"statsParsed" parquet:"statsParsed"` // Option<parquet::record::Row>
 	// Map containing metadata about this file
-	Tags *map[string]*string `json:"tags" parquet:"Tags"`
+	Tags map[string]*string `json:"tags" parquet:"Tags"`
 	// Contains statistics (e.g., count, min/max values for columns) about the data in this file
 	Stats *string `json:"stats" parquet:"Stats"`
 }
@@ -80,19 +82,19 @@ type Add struct {
 // This is a top-level action in Delta log entries.
 type Remove struct {
 	// The path of the file that is removed from the table.
-	Path *string `json:"path" parquet:"Path"`
+	Path string `json:"path" parquet:"Path"`
 	// The timestamp when the remove was added to table state.
 	DeletionTimestamp *DeltaDataTypeTimestamp `json:"deletionTimestamp,omitempty" parquet:"DeletionTimestamp"`
 	// Whether data is changed by the remove. A table optimize will report this as false for
 	// example, since it adds and removes files by combining many files into one.
-	DataChange *bool `json:"dataChange" parquet:"DataChange"`
+	DataChange bool `json:"dataChange" parquet:"DataChange"`
 	// When true the fields partitionValues, size, and tags are present
 	//
 	// NOTE: Although it's defined as required in scala delta implementation, but some writes
 	// it's still nullable so we keep it as Option<> for compatibly.
 	ExtendedFileMetadata *bool `json:"extendedFileMetadata,omitempty" parquet:"ExtendedFileMetadata"`
 	// A map from partition column to value for this file.
-	PartitionValues *map[string]*string `json:"partitionValues" parquet:"PartitionValues"`
+	PartitionValues map[string]*string `json:"partitionValues" parquet:"PartitionValues"`
 	// Size of this file in bytes
 	Size *DeltaDataTypeLong `json:"size,omitempty" parquet:"Size"`
 	// Map containing metadata about this file
@@ -103,19 +105,19 @@ type Remove struct {
 // This is a top-level action in Delta log entries.
 type Metadata struct {
 	// Unique identifier for this table
-	Id *string `json:"path" parquet:"Path"`
+	Id string `json:"path" parquet:"Path"`
 	// User-provided identifier for this table
 	Name *string `json:"name,omitempty" parquet:"Name"`
 	// User-provided description for this table
 	Description *string `json:"description,omitempty" parquet:"Description"`
 	// Specification of the encoding for the files stored in the table
-	Format *Format `json:"format" parquet:"Format"`
+	Format Format `json:"format" parquet:"Format"`
 	// Schema of the table
-	SchemaString *string `json:"schemaString" parquet:"SchemaString"`
+	SchemaString string `json:"schemaString" parquet:"SchemaString"`
 	// An array containing the names of columns by which the data should be partitioned
-	PartitionColumns *[]*string `json:"partitionColumns" parquet:"PartitionColumns"`
+	PartitionColumns []string `json:"partitionColumns" parquet:"PartitionColumns"`
 	// A map containing configuration options for the table
-	Configuration *map[string]*string `json:"configuration" parquet:"Configuration"`
+	Configuration map[string]*string `json:"configuration" parquet:"Configuration"`
 	// The time when this metadata action is created, in milliseconds since the Unix epoch
 	CreatedTime *DeltaDataTypeTimestamp `json:"createdTime,omitempty" parquet:"CreatedTime"`
 }
@@ -125,10 +127,10 @@ type Metadata struct {
 type Protocol struct {
 	// Minimum version of the Delta read protocol a client must implement to correctly read the
 	// table.
-	MinReaderVersion *DeltaTableTypeInt `json:"minReaderVersion" parquet:"MinReaderVersion"`
+	MinReaderVersion DeltaTableTypeInt `json:"minReaderVersion" parquet:"MinReaderVersion"`
 	// Minimum version of the Delta write protocol a client must implement to correctly read the
 	// table.
-	MinWriterVersion *DeltaTableTypeInt `json:"minWriterVersion" parquet:"MinWriterVersion"`
+	MinWriterVersion DeltaTableTypeInt `json:"minWriterVersion" parquet:"MinWriterVersion"`
 }
 
 type Cdc struct {
@@ -140,9 +142,9 @@ type Cdc struct {
 
 type Format struct {
 	// Name of the encoding for files in this table.
-	Provider *string `json:"provider" parquet:"Provider"`
+	Provider string `json:"provider" parquet:"Provider"`
 	// A map containing configuration options for the format.
-	Options *map[string]*string `json:"options" parquet:"Options"`
+	Options map[string]*string `json:"options" parquet:"Options"`
 }
 
 type ColumnValueStat struct {
@@ -152,11 +154,78 @@ type ColumnValueStat struct {
 	Value json.RawMessage
 }
 
+func (cvt *ColumnValueStat) MarshalJSON() ([]byte, error) {
+	if cvt.Column != nil {
+		return json.Marshal(&cvt.Column)
+	}
+	if cvt.Value != nil {
+		return []byte(cvt.Value), nil
+	}
+
+	return nil, fmt.Errorf("cannot marshal ColumnValueStat with nil values for both Column and Value")
+}
+
+func (cvt *ColumnValueStat) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	token, err := dec.Token()
+	if err == io.EOF {
+		return fmt.Errorf("attempting to unmarshal empty document")
+	}
+	if err != nil {
+		return err
+	}
+
+	_, isDelim := token.(json.Delim)
+	if isDelim && token != '{' {
+		return fmt.Errorf("invalid input for ColumnValueStat.UnmarshalJSON")
+	}
+
+	if token == '{' {
+		col := make(map[string]ColumnValueStat)
+		if err := json.Unmarshal(data, &col); err != nil {
+			return fmt.Errorf("error while unmarshaling nested columnvaluestat: %w", err)
+		}
+		cvt.Column = col
+		return nil
+	}
+
+	cvt.Value = json.RawMessage(data)
+
+	return nil
+}
+
 type ColumnCountStat struct {
-	// Composite HashMap representation of statistics.
 	Column map[string]ColumnCountStat
-	// Json representation of statistics.
-	Value DeltaDataTypeLong
+	Value  *DeltaDataTypeLong
+}
+
+func (cct *ColumnCountStat) MarshalJSON() ([]byte, error) {
+	if cct.Column != nil {
+		return json.Marshal(&cct.Column)
+	}
+	if cct.Value != nil {
+		return json.Marshal(&cct.Value)
+	}
+
+	return nil, fmt.Errorf("cannot marshal ColumnCountStat with nil values for both Column and Value")
+}
+
+func (cct *ColumnCountStat) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if v, ok := raw.(DeltaDataTypeLong); ok {
+		cct.Value = &v
+		return nil
+	}
+	if c, ok := raw.(map[string]ColumnCountStat); ok {
+		cct.Column = c
+		return nil
+	}
+
+	return fmt.Errorf("value for ColumnCountStat is neither Column nor Value")
 }
 
 // Statistics associated with Add actions contained in the Delta log.
@@ -249,41 +318,44 @@ type Notebook struct {
 // Operation performed when creating a new log entry with one or more actions.
 // This is a key element of the `CommitInfo` action.
 type DeltaOperation struct {
-	// Represents a Delta `Create` operation.
-	// Would usually only create the table, if also data is written,
-	// a `Write` operations is more appropriate
-	Create *struct {
-		// The save mode used during the create.
-		Mode SaveMode
-		// The storage location of the new table
-		Location string
-		// The min reader and writer protocol versions of the table
-		Protocol Protocol
-		// Metadata associated with the new table
-		Metadata DeltaTableMetaData
-	}
+	Create          *CreateOperation          `json:"create,omitempty"`
+	Write           *WriteOperation           `json:"write,omitempty"`
+	StreamingUpdate *StreamingUpdateOperation `json:"streamingUpdate,omitempty"`
+}
 
-	// Represents a Delta `Write` operation.
-	// Write operations will typically only include `Add` actions.
-	Write *struct {
-		// The save mode used during the write.
-		Mode SaveMode
-		// The columns the write is partitioned by.
-		PartitionBy *[]string
-		// The predicate used during the write.
-		Predicate *string
-	}
+// Represents a Delta `Create` operation.
+// Would usually only create the table, if also data is written,
+// a `Write` operations is more appropriate
+type CreateOperation struct {
+	// The save mode used during the create.
+	Mode SaveMode `json:"saveMode"`
+	// The storage location of the new table
+	Location string `json:"location"`
+	// The min reader and writer protocol versions of the table
+	Protocol Protocol `json:"protocol"`
+	// Metadata associated with the new table
+	Metadata DeltaTableMetaData `json:"metadata"`
+}
 
-	// Represents a Delta `StreamingUpdate` operation.
-	StreamingUpdate *struct {
-		// The output mode the streaming writer is using.
-		OutputMode OutputMode
-		// The query id of the streaming writer.
-		QueryId string
-		// The epoch id of the written micro-batch.
-		EpochId int64
-	}
-	// TODO: Add more operations
+// Represents a Delta `StreamingUpdate` operation.
+type StreamingUpdateOperation struct {
+	// The output mode the streaming writer is using.
+	OutputMode OutputMode `json:"outputMode"`
+	// The query id of the streaming writer.
+	QueryId string `json:"queryId"`
+	// The epoch id of the written micro-batch.
+	EpochId int64 `json:"epochId"`
+}
+
+// Represents a Delta `Write` operation.
+// Write operations will typically only include `Add` actions.
+type WriteOperation struct {
+	// The save mode used during the write.
+	Mode SaveMode
+	// The columns the write is partitioned by.
+	PartitionBy *[]string
+	// The predicate used during the write.
+	Predicate *string
 }
 
 func (op *DeltaOperation) GetCommitInfo() util.RawJsonMap {
@@ -346,20 +418,20 @@ func decodePath(path string) (string, error) {
 }
 
 func (x *Add) PathDecoded() error {
-	p, err := decodePath(*x.Path)
+	p, err := decodePath(x.Path)
 	if err != nil {
 		return err
 	}
-	x.Path = &p
+	x.Path = p
 	return nil
 }
 
 func (x *Remove) PathDecoded() error {
-	p, err := decodePath(*x.Path)
+	p, err := decodePath(x.Path)
 	if err != nil {
 		return err
 	}
-	x.Path = &p
+	x.Path = p
 	return nil
 }
 
@@ -390,15 +462,15 @@ func (m *Metadata) TryConvertToDeltaTableMetaData() (*DeltaTableMetaData, error)
 		Description:      m.Description,
 		Format:           m.Format,
 		Schema:           schema,
-		PartitionColumns: convertPointerSlice(*m.PartitionColumns),
+		PartitionColumns: m.PartitionColumns,
 		CreatedTime:      m.CreatedTime,
-		Configuration:    convertPointerMap(*m.Configuration),
+		Configuration:    convertPointerMap(m.Configuration),
 	}, nil
 }
 
 func (m *Metadata) GetSchema() (*schema.Schema, error) {
 	var s schema.Schema
-	if err := json.Unmarshal([]byte(*m.SchemaString), &s); err != nil {
+	if err := json.Unmarshal([]byte(m.SchemaString), &s); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal schema: %w", err)
 	}
 	return &s, nil

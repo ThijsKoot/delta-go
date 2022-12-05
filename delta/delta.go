@@ -1,6 +1,7 @@
 package delta
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/thijskoot/delta-go/delta/schema"
 	"github.com/thijskoot/delta-go/storage"
 	"github.com/thijskoot/delta-go/util"
+	"gocloud.dev/blob"
 )
 
 const DEFAULT_DELTA_MAX_RETRY_COMMIT_ATTEMPTS uint32 = 10_000_000
@@ -28,6 +30,7 @@ type DeltaTable struct {
 	State DeltaTableState
 	// metadata
 	// application_transactions
+
 	Storage storage.StorageBackend // StorageBackend
 
 	LastCheckPoint   *CheckPoint
@@ -83,13 +86,13 @@ type CheckPoint struct {
 
 type DeltaTableMetaData struct {
 	// Unique identifier for this table
-	Id *string
+	Id string
 	// User-provided identifier for this table
 	Name *string
 	// User-provided description for this table
 	Description *string
 	// Specification of the encoding for the files stored in the table
-	Format *Format
+	Format Format
 	// Schema of the table
 	Schema *schema.Schema
 	// An array containing the names of columns by which the data should be partitioned
@@ -166,28 +169,25 @@ type DeltaDataTypeVersion = DeltaDataTypeLong
 type DeltaDataTypeTimestamp = DeltaDataTypeLong
 type DeltaTableTypeInt = int32
 
-func OpenTable(tableUri string) (*DeltaTable, error) {
+func OpenTable(tableUri string, bucket *blob.Bucket) (*DeltaTable, error) {
 	// TODO: do we need to create a builder or would DeltaTable suffice, calling Load() on that?
-	builder, err := NewDeltaTableBuilderFromUri(tableUri)
+	backend, err := storage.NewBackend(bucket)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open delta table: %w", err)
+		return nil, fmt.Errorf("unable to create backend: %w", err)
 	}
-	table, err := builder.Load()
+
+	table, err := newDeltaTableBuilder(tableUri, backend).Load()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load delta table: %w", err)
 	}
 	return table, nil
 }
 
-func NewDeltaTableBuilderFromUri(tableUri string, opts ...DeltaTableBuilderOption) (*DeltaTableBuilder, error) {
-	backend, err := storage.NewBackendForUri(tableUri)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create backend for uri: %w", err)
-	}
+func newDeltaTableBuilder(tableUri string, storageBackend storage.StorageBackend, opts ...DeltaTableBuilderOption) *DeltaTableBuilder {
 	builder := &DeltaTableBuilder{
 		DeltaTableLoadOptions{
 			TableUri:          tableUri,
-			StorageBackend:    backend,
+			StorageBackend:    storageBackend,
 			RequireTombstones: true,
 			RequireFiles:      true,
 			Version:           NewDefaultDeltaVersion(),
@@ -196,7 +196,7 @@ func NewDeltaTableBuilderFromUri(tableUri string, opts ...DeltaTableBuilderOptio
 	for _, o := range opts {
 		o(builder)
 	}
-	return builder, nil
+	return builder
 }
 
 type DeltaTableBuilderOption = func(*DeltaTableBuilder)
@@ -261,7 +261,7 @@ func (b *DeltaTableBuilder) Load() (*DeltaTable, error) {
 
 func NewDeltaTable(tableUri string, storageBackend storage.StorageBackend, config DeltaTableConfig) (*DeltaTable, error) {
 	tableUri = storageBackend.TrimPath(tableUri)
-	logUriNormalized := storageBackend.JoinPath(tableUri, "_delta_log")
+	logUriNormalized := storageBackend.JoinPaths(tableUri, "_delta_log")
 
 	table := &DeltaTable{
 		Version:          -1,
@@ -309,7 +309,7 @@ func (d *DeltaTable) Update() error {
 }
 
 func (d *DeltaTable) RestoreCheckPoint(checkpoint *CheckPoint) error {
-	state, err := NewDeltaTableStateFromCheckPoint(d, checkpoint)
+	state, err := newDeltaTableStateFromCheckPoint(d, checkpoint)
 	if err != nil {
 		return fmt.Errorf("unable to restore checkpoint: %w", err)
 	}
@@ -326,11 +326,11 @@ func (d *DeltaTable) UpdateIncremental() error {
 			return fmt.Errorf("unable to peek next commit: %w", err)
 		}
 		if peekCommit.UpToDate {
-			break
+			return nil
 		}
 
-		if !peekCommit.UpToDate {
-			d.ApplyActions(peekCommit.New.Version, peekCommit.New.Actions)
+		if err := d.ApplyActions(peekCommit.New.Version, peekCommit.New.Actions); err != nil {
+			return err
 		}
 
 		if d.Version == -1 {
@@ -338,7 +338,6 @@ func (d *DeltaTable) UpdateIncremental() error {
 		}
 	}
 
-	return nil
 }
 
 // Get the list of actions for the next commit
@@ -354,7 +353,7 @@ func (d *DeltaTable) PeekNextCommit(currentVersion DeltaDataTypeVersion) (*PeekC
 		}, nil
 	}
 
-	dec := json.NewDecoder(strings.NewReader(string(commitLogBytes)))
+	dec := json.NewDecoder(bytes.NewReader(commitLogBytes))
 	actions := make([]Action, 0)
 	for {
 		var a Action
@@ -399,11 +398,11 @@ func (d *DeltaTable) ApplyActions(newVersion DeltaDataTypeVersion, actions []Act
 
 func (d *DeltaTable) CommitUriFromVersion(version DeltaDataTypeVersion) string {
 	v := fmt.Sprintf("%020d.json", version)
-	return d.Storage.JoinPath(d.LogUri, v)
+	return d.Storage.JoinPaths(d.LogUri, v)
 }
 
 func (d *DeltaTable) GetLastCheckpoint() (*CheckPoint, error) {
-	lastCheckpointPath := d.Storage.JoinPath(d.LogUri, "_last_checkpoint")
+	lastCheckpointPath := d.Storage.JoinPaths(d.LogUri, "_last_checkpoint")
 	// FIXME: return custom not found error
 	data, err := d.Storage.GetObj(lastCheckpointPath)
 	if err != nil {
@@ -423,7 +422,7 @@ func (d *DeltaTable) GetLastCheckpoint() (*CheckPoint, error) {
 
 func (d *DeltaTable) GetCheckPointDataPaths(checkPoint *CheckPoint) []string {
 	prefixPattern := fmt.Sprintf("%020d", checkPoint.Version)
-	prefix := d.Storage.JoinPath(d.LogUri, prefixPattern)
+	prefix := d.Storage.JoinPaths(d.LogUri, prefixPattern)
 
 	if checkPoint.Parts == nil {
 		return []string{fmt.Sprintf("%s.checkpoint.parquet", prefix)}
@@ -538,7 +537,7 @@ func (tx *DeltaTransaction) PrepareCommit(op *DeltaOperation, appMeta util.RawJs
 
 	token := uuid.New()
 	fileName := fmt.Sprintf("_commit_%s.json.tmp", token.String())
-	uri := tx.DeltaTable.Storage.JoinPath(tx.DeltaTable.LogUri, fileName)
+	uri := tx.DeltaTable.Storage.JoinPaths(tx.DeltaTable.LogUri, fileName)
 
 	if err := tx.DeltaTable.Storage.PutObj(uri, []byte(logEntry)); err != nil {
 		return PreparedCommit{}, fmt.Errorf("unable to upload temporary commit: %w", err)
