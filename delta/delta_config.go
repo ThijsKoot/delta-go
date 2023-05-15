@@ -8,36 +8,36 @@ import (
 )
 
 var (
-	CONFIG_CHECKPOINT_INTERVAL = DeltaConfig{
+	CONFIG_CHECKPOINT_INTERVAL = Config{
 		Key:     "checkpointInterval",
 		Default: "10",
 	}
 
-	CONFIG_TOMBSTONE_RETENTION = DeltaConfig{
+	CONFIG_TOMBSTONE_RETENTION = Config{
 		Key:     "deletedFileRetentionDuration",
 		Default: "interval 1 week",
 	}
 
-	CONFIG_LOG_RETENTION = DeltaConfig{
+	CONFIG_LOG_RETENTION = Config{
 		Key:     "logRetentionDuration",
 		Default: "interval 30 day",
 	}
 
-	CONFIG_ENABLE_EXPIRED_LOG_CLEANUP = DeltaConfig{
+	CONFIG_ENABLE_EXPIRED_LOG_CLEANUP = Config{
 		Key:     "enableExpiredLogCleanup",
 		Default: "true",
 	}
 )
 
 // Delta table's `metadata.configuration` entry.
-type DeltaConfig struct {
+type Config struct {
 	// The configuration name
 	Key string
 	// The default value if `key` is not set in `metadata.configuration`.
 	Default string
 }
 
-func (d *DeltaConfig) GetRawFromMetadata(metadata *DeltaTableMetaData) string {
+func (d *Config) GetRawFromMetadata(metadata *TableMetadata) string {
 	v, ok := metadata.Configuration[d.Key]
 	if ok {
 		return v
@@ -45,7 +45,7 @@ func (d *DeltaConfig) GetRawFromMetadata(metadata *DeltaTableMetaData) string {
 	return d.Default
 }
 
-func (d *DeltaConfig) GetIntFromMetadata(metadata *DeltaTableMetaData) (int32, error) {
+func (d *Config) GetIntFromMetadata(metadata *TableMetadata) (int32, error) {
 	v := d.GetRawFromMetadata(metadata)
 	c, err := strconv.ParseInt(v, 10, 32)
 	if err != nil {
@@ -54,7 +54,7 @@ func (d *DeltaConfig) GetIntFromMetadata(metadata *DeltaTableMetaData) (int32, e
 	return int32(c), nil
 }
 
-func (d *DeltaConfig) GetLongFromMetadata(metadata *DeltaTableMetaData) (int64, error) {
+func (d *Config) GetLongFromMetadata(metadata *TableMetadata) (int64, error) {
 	v := d.GetRawFromMetadata(metadata)
 	c, err := strconv.ParseInt(v, 10, 64)
 	if err != nil {
@@ -63,7 +63,7 @@ func (d *DeltaConfig) GetLongFromMetadata(metadata *DeltaTableMetaData) (int64, 
 	return c, nil
 }
 
-func (d *DeltaConfig) GetBoolFromMetadata(metadata *DeltaTableMetaData) (bool, error) {
+func (d *Config) GetBoolFromMetadata(metadata *TableMetadata) (bool, error) {
 	v := d.GetRawFromMetadata(metadata)
 	c, err := strconv.ParseBool(v)
 	if err != nil {
@@ -72,7 +72,7 @@ func (d *DeltaConfig) GetBoolFromMetadata(metadata *DeltaTableMetaData) (bool, e
 	return c, nil
 }
 
-func (d *DeltaConfig) GetDurationFromMetadata(metadata *DeltaTableMetaData) (time.Duration, error) {
+func (d *Config) GetDurationFromMetadata(metadata *TableMetadata) (time.Duration, error) {
 	v := d.GetRawFromMetadata(metadata)
 
 	words := strings.Split(v, " ")
@@ -110,6 +110,6 @@ func (d *DeltaConfig) GetDurationFromMetadata(metadata *DeltaTableMetaData) (tim
 	return unit * time.Duration(quantity), nil
 }
 
-func (d *DeltaConfig) Apply(metadata *DeltaTableMetaData, value string) {
+func (d *Config) Apply(metadata *TableMetadata, value string) {
 	metadata.Configuration[d.Key] = value
 }

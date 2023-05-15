@@ -20,15 +20,15 @@ import (
 const DEFAULT_DELTA_MAX_RETRY_COMMIT_ATTEMPTS uint32 = 10_000_000
 
 // In memory representation of a Delta Table
-type DeltaTable struct {
+type Table struct {
 	// The version of the table as of the most recent loaded Delta log entry.
 	Version types.Version
 	// The URI the DeltaTable was loaded from.
 	TableUri string
 	// the load options used during load
-	Config DeltaTableConfig
+	Config TableConfig
 
-	State DeltaTableState
+	State TableState
 	// metadata
 	// application_transactions
 
@@ -52,7 +52,7 @@ type PeekCommit struct {
 }
 
 // Options for customizing behavior of a `DeltaTransaction`
-type DeltaTransactionOptions struct {
+type TransactionOptions struct {
 	// number of retry attempts allowed when committing a transaction
 	MaxRetryCommitAttempts uint32
 }
@@ -68,10 +68,10 @@ type DeltaTransactionOptions struct {
 //
 // Please not that in case of non-retryable error the temporary commit file such as
 // `_delta_log/_commit_<uuid>.json` will orphaned in storage.
-type DeltaTransaction struct {
-	DeltaTable *DeltaTable //&'a mut DeltaTable,
+type Transaction struct {
+	DeltaTable *Table //&'a mut DeltaTable,
 	Actions    []Action
-	Options    DeltaTransactionOptions
+	Options    TransactionOptions
 }
 
 type PreparedCommit struct {
@@ -85,7 +85,7 @@ type CheckPoint struct {
 	Parts   *uint32 // 10 digits decimals
 }
 
-type DeltaTableMetaData struct {
+type TableMetadata struct {
 	// Unique identifier for this table
 	Id string
 	// User-provided identifier for this table
@@ -104,7 +104,25 @@ type DeltaTableMetaData struct {
 	Configuration map[string]string
 }
 
-type DeltaTableConfig struct {
+func (tm *TableMetadata) ToAction() (*ActionMetadata, error) {
+	schemaString, err := tm.Schema.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal schema to JSON")
+	}
+
+	return &ActionMetadata{
+		Id:               tm.Id,
+		Name:             tm.Name,
+		Description:      tm.Description,
+		Format:           tm.Format,
+		SchemaString:     string(schemaString),
+		PartitionColumns: tm.PartitionColumns,
+		Configuration:    tm.Configuration,
+		CreatedTime:      tm.CreatedTime,
+	}, nil
+}
+
+type TableConfig struct {
 	// Indicates whether our use case requires tracking tombstones.
 	// This defaults to `true`
 	//
@@ -121,7 +139,7 @@ type DeltaTableConfig struct {
 	RequireFiles bool
 }
 
-type DeltaTableLoadOptions struct {
+type TableLoadOptions struct {
 	// table root uri
 	TableUri string
 	// backend to access storage system
@@ -144,8 +162,8 @@ type DeltaTableLoadOptions struct {
 	RequireFiles bool
 }
 
-type DeltaTableBuilder struct {
-	Options DeltaTableLoadOptions
+type TableBuilder struct {
+	Options TableLoadOptions
 }
 
 type DeltaVersion struct {
@@ -163,30 +181,23 @@ func NewDefaultDeltaVersion() DeltaVersion {
 	}
 }
 
-// type Guid = string
-// type types.Duration = time.Duration
-// type types.Long = int64
-// type types.Version = types.Long
-// type types.Timestamp = types.Long
-// type DeltaTableTypeInt = int32
-
-func OpenTable(tableUri string, bucket *blob.Bucket) (*DeltaTable, error) {
+func OpenTable(tableUri string, bucket *blob.Bucket) (*Table, error) {
 	// TODO: do we need to create a builder or would DeltaTable suffice, calling Load() on that?
 	backend, err := storage.NewBackend(bucket)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create backend: %w", err)
 	}
 
-	table, err := newDeltaTableBuilder(tableUri, backend).Load()
+	table, err := newTableBuilder(tableUri, backend).Load()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load delta table: %w", err)
 	}
 	return table, nil
 }
 
-func newDeltaTableBuilder(tableUri string, storageBackend storage.StorageBackend, opts ...DeltaTableBuilderOption) *DeltaTableBuilder {
-	builder := &DeltaTableBuilder{
-		DeltaTableLoadOptions{
+func newTableBuilder(tableUri string, storageBackend storage.StorageBackend, opts ...TableBuilderOption) *TableBuilder {
+	builder := &TableBuilder{
+		TableLoadOptions{
 			TableUri:          tableUri,
 			StorageBackend:    storageBackend,
 			RequireTombstones: true,
@@ -200,31 +211,31 @@ func newDeltaTableBuilder(tableUri string, storageBackend storage.StorageBackend
 	return builder
 }
 
-type DeltaTableBuilderOption = func(*DeltaTableBuilder)
+type TableBuilderOption = func(*TableBuilder)
 
 // Sets `require_tombstones=false` to the builder
-func WithoutTombstones() DeltaTableBuilderOption {
-	return func(d *DeltaTableBuilder) {
+func WithoutTombstones() TableBuilderOption {
+	return func(d *TableBuilder) {
 		d.Options.RequireTombstones = false
 	}
 }
 
 // Sets `require_files=false` to the builder
-func WithoutFiles() DeltaTableBuilderOption {
-	return func(d *DeltaTableBuilder) {
+func WithoutFiles() TableBuilderOption {
+	return func(d *TableBuilder) {
 		d.Options.RequireFiles = false
 	}
 }
 
 // Sets `version` to the builder
-func WithVersion(version types.Version) DeltaTableBuilderOption {
-	return func(d *DeltaTableBuilder) {
+func WithVersion(version types.Version) TableBuilderOption {
+	return func(d *TableBuilder) {
 		d.Options.Version.Version = &version
 	}
 }
 
 // specify the timestamp given as ISO-8601/RFC-3339 timestamp
-func WithDatestring(dateString string) (DeltaTableBuilderOption, error) {
+func WithDatestring(dateString string) (TableBuilderOption, error) {
 	t, err := time.Parse(time.RFC3339, dateString)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse time from input '%s': %w", dateString, err)
@@ -233,26 +244,26 @@ func WithDatestring(dateString string) (DeltaTableBuilderOption, error) {
 }
 
 // specify a timestamp
-func WithTimestamp(timestamp time.Time) DeltaTableBuilderOption {
-	return func(d *DeltaTableBuilder) {
+func WithTimestamp(timestamp time.Time) TableBuilderOption {
+	return func(d *TableBuilder) {
 		d.Options.Version.Timestamp = &timestamp
 	}
 }
 
 // explicitely set a backend (override backend derived from `table_uri`)
-func WithStorageBackend(storage storage.StorageBackend) DeltaTableBuilderOption {
-	return func(d *DeltaTableBuilder) {
+func WithStorageBackend(storage storage.StorageBackend) TableBuilderOption {
+	return func(d *TableBuilder) {
 		d.Options.StorageBackend = storage
 	}
 }
 
-func (b *DeltaTableBuilder) Load() (*DeltaTable, error) {
-	config := DeltaTableConfig{
+func (b *TableBuilder) Load() (*Table, error) {
+	config := TableConfig{
 		RequireTombstones: b.Options.RequireTombstones,
 		RequireFiles:      b.Options.RequireFiles,
 	}
 
-	table, err := NewDeltaTable(b.Options.TableUri, b.Options.StorageBackend, config)
+	table, err := NewTable(b.Options.TableUri, b.Options.StorageBackend, config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create DeltaTable: %w", err)
 	}
@@ -260,13 +271,13 @@ func (b *DeltaTableBuilder) Load() (*DeltaTable, error) {
 	return table.Load()
 }
 
-func NewDeltaTable(tableUri string, storageBackend storage.StorageBackend, config DeltaTableConfig) (*DeltaTable, error) {
+func NewTable(tableUri string, storageBackend storage.StorageBackend, config TableConfig) (*Table, error) {
 	tableUri = storageBackend.TrimPath(tableUri)
 	logUriNormalized := storageBackend.JoinPaths(tableUri, "_delta_log")
 
-	table := &DeltaTable{
+	table := &Table{
 		Version:          -1,
-		State:            DeltaTableState{},
+		State:            TableState{},
 		Storage:          storageBackend,
 		TableUri:         tableUri,
 		Config:           config,
@@ -278,10 +289,10 @@ func NewDeltaTable(tableUri string, storageBackend storage.StorageBackend, confi
 	return table, nil
 }
 
-func (d *DeltaTable) Load() (*DeltaTable, error) {
+func (d *Table) Load() (*Table, error) {
 	d.LastCheckPoint = nil
 	d.Version = -1
-	d.State = *NewDeltaTableState()
+	d.State = *NewTableState()
 	if err := d.Update(); err != nil {
 		return nil, fmt.Errorf("unable to update state: %w", err)
 	}
@@ -291,7 +302,7 @@ func (d *DeltaTable) Load() (*DeltaTable, error) {
 
 // Updates the DeltaTable to the most recent state committed to the transaction log by
 // loading the last checkpoint and incrementally applying each version since.
-func (d *DeltaTable) Update() error {
+func (d *Table) Update() error {
 	cp, err := d.GetLastCheckpoint()
 	if err != nil {
 		return fmt.Errorf("unable to update: %w", err)
@@ -309,8 +320,8 @@ func (d *DeltaTable) Update() error {
 	}
 }
 
-func (d *DeltaTable) RestoreCheckPoint(checkpoint *CheckPoint) error {
-	state, err := newDeltaTableStateFromCheckPoint(d, checkpoint)
+func (d *Table) RestoreCheckPoint(checkpoint *CheckPoint) error {
+	state, err := newTableStateFromCheckPoint(d, checkpoint)
 	if err != nil {
 		return fmt.Errorf("unable to restore checkpoint: %w", err)
 	}
@@ -320,7 +331,7 @@ func (d *DeltaTable) RestoreCheckPoint(checkpoint *CheckPoint) error {
 
 // Updates the DeltaTable to the latest version by incrementally applying newer versions.
 // It assumes that the table is already updated to the current version `self.version`.
-func (d *DeltaTable) UpdateIncremental() error {
+func (d *Table) UpdateIncremental() error {
 	for {
 		peekCommit, err := d.PeekNextCommit(d.Version)
 		if err != nil {
@@ -342,7 +353,7 @@ func (d *DeltaTable) UpdateIncremental() error {
 }
 
 // Get the list of actions for the next commit
-func (d *DeltaTable) PeekNextCommit(currentVersion types.Version) (*PeekCommit, error) {
+func (d *Table) PeekNextCommit(currentVersion types.Version) (*PeekCommit, error) {
 	nextVersion := currentVersion + 1
 	commitUri := d.CommitUriFromVersion(nextVersion)
 	commitLogBytes, err := d.Storage.GetObj(commitUri)
@@ -381,12 +392,12 @@ func (d *DeltaTable) PeekNextCommit(currentVersion types.Version) (*PeekCommit, 
 
 }
 
-func (d *DeltaTable) ApplyActions(newVersion types.Version, actions []Action) error {
+func (d *Table) ApplyActions(newVersion types.Version, actions []Action) error {
 	if d.Version+1 != newVersion {
 		return fmt.Errorf("version mismatch, old version is %v, new version is %v", d.Version, newVersion)
 	}
 
-	state, err := NewDeltaTableStateFromActions(actions)
+	state, err := NewTableStateFromActions(actions)
 	if err != nil {
 		return fmt.Errorf("unable to create state from actions: %w", err)
 	}
@@ -397,12 +408,12 @@ func (d *DeltaTable) ApplyActions(newVersion types.Version, actions []Action) er
 	return nil
 }
 
-func (d *DeltaTable) CommitUriFromVersion(version types.Version) string {
+func (d *Table) CommitUriFromVersion(version types.Version) string {
 	v := fmt.Sprintf("%020d.json", version)
 	return d.Storage.JoinPaths(d.LogUri, v)
 }
 
-func (d *DeltaTable) GetLastCheckpoint() (*CheckPoint, error) {
+func (d *Table) GetLastCheckpoint() (*CheckPoint, error) {
 	lastCheckpointPath := d.Storage.JoinPaths(d.LogUri, "_last_checkpoint")
 	// FIXME: return custom not found error
 	data, err := d.Storage.GetObj(lastCheckpointPath)
@@ -421,7 +432,7 @@ func (d *DeltaTable) GetLastCheckpoint() (*CheckPoint, error) {
 	return &cp, nil
 }
 
-func (d *DeltaTable) GetCheckPointDataPaths(checkPoint *CheckPoint) []string {
+func (d *Table) GetCheckPointDataPaths(checkPoint *CheckPoint) []string {
 	prefixPattern := fmt.Sprintf("%020d", checkPoint.Version)
 	prefix := d.Storage.JoinPaths(d.LogUri, prefixPattern)
 
@@ -444,7 +455,7 @@ func (d *DeltaTable) GetCheckPointDataPaths(checkPoint *CheckPoint) []string {
 // This is low-level transaction API. If user does not want to maintain the commit loop then
 // the `DeltaTransaction.commit` is desired to be used as it handles `try_commit_transaction`
 // with retry logic.
-func (d *DeltaTable) TryCommitTransaction(commit PreparedCommit, version types.Version) (types.Version, error) {
+func (d *Table) TryCommitTransaction(commit PreparedCommit, version types.Version) (types.Version, error) {
 	err := d.Storage.RenameObjNoReplace(commit.Uri, d.CommitUriFromVersion(version))
 	if errors.Is(err, &storage.ErrAlreadyExists{}) {
 		return 0, &ErrVersionAlreadyExists{
@@ -463,29 +474,29 @@ func (d *DeltaTable) TryCommitTransaction(commit PreparedCommit, version types.V
 }
 
 // Creates a new DeltaTransaction for the DeltaTable.
-func (d *DeltaTable) CreateTransaction(options *DeltaTransactionOptions) DeltaTransaction {
-	return NewDeltaTransaction(d, options)
+func (d *Table) CreateTransaction(options *TransactionOptions) Transaction {
+	return NewTransaction(d, options)
 }
 
-func NewDeltaTransaction(table *DeltaTable, options *DeltaTransactionOptions) DeltaTransaction {
-	var o DeltaTransactionOptions
+func NewTransaction(table *Table, options *TransactionOptions) Transaction {
+	var o TransactionOptions
 	if options == nil {
-		o = DeltaTransactionOptions{
+		o = TransactionOptions{
 			MaxRetryCommitAttempts: DEFAULT_DELTA_MAX_RETRY_COMMIT_ATTEMPTS,
 		}
 	} else {
 		o = *options
 	}
 
-	return DeltaTransaction{
+	return Transaction{
 		DeltaTable: table,
 		Actions:    nil,
 		Options:    o,
 	}
 }
 
-func (d *DeltaTable) Create(metadata DeltaTableMetaData, protocol Protocol, commitInfo map[string]string, addActions []Add) error {
-	metaAction, err := MetaDataFromDeltaTableMetaData(&metadata)
+func (d *Table) Create(metadata TableMetadata, protocol ActionProtocol, commitInfo map[string]string, addActions []ActionAdd) error {
+	metaAction, err := metadata.ToAction()
 	if err != nil {
 		return fmt.Errorf("error converting metadata to action: %w", err)
 	}
@@ -497,7 +508,6 @@ func (d *DeltaTable) Create(metadata DeltaTableMetaData, protocol Protocol, comm
 		}
 	}
 
-	// FIXME: add version
 	enrichedCommitInfo.MustUpsert("delta-go", "0.0.0")
 	enrichedCommitInfo.MustUpsert("delta-go", time.Now().Format(time.RFC3339))
 
@@ -525,7 +535,7 @@ func (d *DeltaTable) Create(metadata DeltaTableMetaData, protocol Protocol, comm
 		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	newState, err := NewDeltaTableStateFromCommit(d, committedVersion)
+	newState, err := NewTableStateFromCommit(d, committedVersion)
 	if err != nil {
 		return err
 	}
@@ -535,11 +545,11 @@ func (d *DeltaTable) Create(metadata DeltaTableMetaData, protocol Protocol, comm
 	return nil
 }
 
-func (tx *DeltaTransaction) AddActions(actions []Action) {
+func (tx *Transaction) AddActions(actions []Action) {
 	tx.Actions = append(tx.Actions, actions...)
 }
 
-func (tx *DeltaTransaction) Commit(op *DeltaOperation, appMetadata map[string]json.RawMessage) (types.Version, error) {
+func (tx *Transaction) Commit(op *DeltaOperation, appMetadata map[string]json.RawMessage) (types.Version, error) {
 	preparedCommit, err := tx.PrepareCommit(op, appMetadata)
 	if err != nil {
 		return 0, fmt.Errorf("unable to prepare commit: %w", err)
@@ -553,7 +563,7 @@ func (tx *DeltaTransaction) Commit(op *DeltaOperation, appMetadata map[string]js
 	return version, nil
 }
 
-func (tx *DeltaTransaction) PrepareCommit(op *DeltaOperation, appMeta util.RawJsonMap) (PreparedCommit, error) {
+func (tx *Transaction) PrepareCommit(op *DeltaOperation, appMeta util.RawJsonMap) (PreparedCommit, error) {
 	var hasCommit bool
 	for _, a := range tx.Actions {
 		if a.GetType() == ActionTypeCommitInfo {
@@ -612,7 +622,7 @@ func LogEntryFromActions(actions []Action) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-func (tx *DeltaTransaction) TryCommit(commit PreparedCommit) (types.Version, error) {
+func (tx *Transaction) TryCommit(commit PreparedCommit) (types.Version, error) {
 	maxTries := int(tx.Options.MaxRetryCommitAttempts)
 	attempt := 0
 	for {

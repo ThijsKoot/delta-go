@@ -7,6 +7,6 @@ import (
 type CreateCommand struct {
 	TableUri string
 	Mode     delta.SaveMode
-	Metadata delta.DeltaTableMetaData
-	Protocol delta.Protocol
+	Metadata delta.TableMetadata
+	Protocol delta.ActionProtocol
 }

@@ -23,7 +23,7 @@ type MinAndMaxValues struct {
 	Max map[string]delta.ColumnValueStat
 }
 
-func createAdd(partitionValues map[string]*string, nullCounts NullCounts, path string, size int64, fileMetadata *metadata.FileMetaData) (delta.Add, error) {
+func createAdd(partitionValues map[string]*string, nullCounts NullCounts, path string, size int64, fileMetadata *metadata.FileMetaData) (delta.ActionAdd, error) {
 	// TODO: skipping a whole bunch of statistics stuff
 
 	modTime := time.Now().UnixMilli()
@@ -31,7 +31,7 @@ func createAdd(partitionValues map[string]*string, nullCounts NullCounts, path s
 
 	minmaxValues, err := minMaxValuesFromFileMetadata(partitionValues, *fileMetadata)
 	if err != nil {
-		return delta.Add{}, fmt.Errorf("unable to create add, got error while calculating minMaxValues: %w", err)
+		return delta.ActionAdd{}, fmt.Errorf("unable to create add, got error while calculating minMaxValues: %w", err)
 	}
 
 	stats := delta.Stats{
@@ -43,11 +43,11 @@ func createAdd(partitionValues map[string]*string, nullCounts NullCounts, path s
 
 	statsBytes, err := json.Marshal(&stats)
 	if err != nil {
-		return delta.Add{}, fmt.Errorf("unable to create add, error while serializing stats: %w", err)
+		return delta.ActionAdd{}, fmt.Errorf("unable to create add, error while serializing stats: %w", err)
 	}
 	statsString := string(statsBytes)
 
-	add := delta.Add{
+	add := delta.ActionAdd{
 		Path:             path,
 		Size:             size,
 		PartitionValues:  partitionValues,

@@ -160,15 +160,15 @@ func GetDeltaSchema() schema.Schema {
 	}
 }
 
-func GetDeltaMetadata(partitionCols []string) delta.DeltaTableMetaData {
+func GetDeltaMetadata(partitionCols []string) delta.TableMetadata {
 	schema := GetDeltaSchema()
-	return delta.DeltaTableMetaData{
+	return delta.TableMetadata{
 		Schema:           &schema,
 		PartitionColumns: partitionCols,
 	}
 }
 
-func CreateBareTable(dir string) *delta.DeltaTable {
+func CreateBareTable(dir string) *delta.Table {
 	bucket, err := fileblob.OpenBucket(dir, nil)
 	if err != nil {
 		panic(err)
@@ -179,7 +179,7 @@ func CreateBareTable(dir string) *delta.DeltaTable {
 		panic(err)
 	}
 
-	table, err := delta.NewDeltaTable("mytable", backend, delta.DeltaTableConfig{})
+	table, err := delta.NewTable("mytable", backend, delta.TableConfig{})
 	if err != nil {
 		panic(err)
 	}
@@ -187,16 +187,16 @@ func CreateBareTable(dir string) *delta.DeltaTable {
 	return table
 }
 
-func CreateInitializedTable(dir string, partitionCols []string) *delta.DeltaTable {
+func CreateInitializedTable(dir string, partitionCols []string) *delta.Table {
 	table := CreateBareTable(dir)
 	schema := GetDeltaSchema()
 
-	protocol := delta.Protocol{
+	protocol := delta.ActionProtocol{
 		MinReaderVersion: 1,
 		MinWriterVersion: 1,
 	}
 
-	metadata := delta.DeltaTableMetaData {
+	metadata := delta.TableMetadata {
 		Schema: &schema,
 		PartitionColumns: partitionCols,
 	}

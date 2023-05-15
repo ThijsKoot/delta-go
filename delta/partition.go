@@ -22,8 +22,8 @@ type PartitionValue[T any] struct {
 	NotIn *[]T
 }
 
-// A Struct DeltaTablePartition used to represent a partition of a DeltaTable.
-type DeltaTablePartition struct {
+// A Struct TablePartition used to represent a partition of a DeltaTable.
+type TablePartition struct {
 	// The key of the DeltaTable partition.
 	Key string
 	// The value of the DeltaTable partition.

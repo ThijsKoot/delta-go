@@ -44,13 +44,13 @@ func main() {
 
 	actions := []delta.Action{
 		{
-			Protocol: &delta.Protocol{
+			Protocol: &delta.ActionProtocol{
 				MinReaderVersion: 1,
 				MinWriterVersion: 2,
 			},
 		},
 		{
-			MetaData: &delta.Metadata{
+			MetaData: &delta.ActionMetadata{
 				CreatedTime: pointer.Int64(time.Now().UnixMilli()),
 				Name:        pointer.String("mytable"),
 				Format: delta.Format{

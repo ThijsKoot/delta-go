@@ -20,10 +20,10 @@ type RecordBatchWriter struct {
 	WriterProperties WriterProperties
 	PartitionColumns []string
 	ArrowWriters     map[string]DataArrowWriter
-	Table            *delta.DeltaTable
+	Table            *delta.Table
 }
 
-func NewRecordBatchWriter(table *delta.DeltaTable) (*RecordBatchWriter, error) {
+func NewRecordBatchWriter(table *delta.Table) (*RecordBatchWriter, error) {
 	meta := table.State.CurrentMetadata
 	if meta == nil {
 		return nil, fmt.Errorf("table has no current metadata")

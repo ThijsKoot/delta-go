@@ -5,5 +5,5 @@ import (
 )
 
 type DeltaCommands struct {
-	Table delta.DeltaTable
+	Table delta.Table
 }

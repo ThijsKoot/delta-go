@@ -24,10 +24,10 @@ type JsonWriter struct {
 	WriterProperties WriterProperties
 	PartitionColumns []string
 	ArrowWriters     map[string]DataArrowWriter
-	Table            *delta.DeltaTable
+	Table            *delta.Table
 }
 
-func NewJsonWriterForTable(table *delta.DeltaTable) (*JsonWriter, error) {
+func NewJsonWriterForTable(table *delta.Table) (*JsonWriter, error) {
 	meta := table.State.CurrentMetadata
 	if meta == nil {
 		return nil, fmt.Errorf("table has no current metadata")

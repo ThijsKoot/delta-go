@@ -17,16 +17,16 @@ import (
 type Action struct {
 	// Used by streaming systems to track progress externally with application specific version
 	// identifiers.
-	Txn *Txn `json:"txn,omitempty" parquet:"Txn"`
+	Txn *ActionTxn `json:"txn,omitempty" parquet:"Txn"`
 	// Adds a file to the table state.
-	Add *Add `json:"add,omitempty" parquet:"Add"`
+	Add *ActionAdd `json:"add,omitempty" parquet:"Add"`
 	// Removes a file from the table state.
-	Remove *Remove `json:"remove,omitempty" parquet:"Remove"`
+	Remove *ActionRemove `json:"remove,omitempty" parquet:"Remove"`
 	// Changes the current metadata of the table. Must be present in the first version of a table.
 	// Subsequent `metaData` actions completely overwrite previous metadata.
-	MetaData *Metadata `json:"metaData,omitempty" parquet:"MetaData"`
+	MetaData *ActionMetadata `json:"metaData,omitempty" parquet:"MetaData"`
 	// Describes the minimum reader and writer versions required to read or write to the table.
-	Protocol *Protocol `json:"protocol,omitempty" parquet:"Protocol"`
+	Protocol *ActionProtocol `json:"protocol,omitempty" parquet:"Protocol"`
 	// Describes commit provenance information for the table.
 	CommitInfo *util.RawJsonMap `json:"commitInfo,omitempty" parquet:"CommitInfo"`
 	// Cdc        *Cdc                        `parquet:"Cdc"`
@@ -34,7 +34,7 @@ type Action struct {
 
 // Action used by streaming systems to track progress using application-specific versions to
 // enable idempotency.
-type Txn struct {
+type ActionTxn struct {
 	// A unique identifier for the application performing the transaction.
 	AppId *string `json:"appId" parquet:"AppId"`
 	// An application-specific numeric identifier for this transaction.
@@ -44,7 +44,7 @@ type Txn struct {
 }
 
 // Delta log action that describes a parquet data file that is part of the table.
-type Add struct {
+type ActionAdd struct {
 	// A relative path, from the root of the table, to a file that should be added to the table
 	Path string `json:"path" parquet:"Path"`
 	// A map from partition column to value for this file
@@ -81,7 +81,7 @@ type Add struct {
 
 // Represents a tombstone (deleted file) in the Delta log.
 // This is a top-level action in Delta log entries.
-type Remove struct {
+type ActionRemove struct {
 	// The path of the file that is removed from the table.
 	Path string `json:"path" parquet:"Path"`
 	// The timestamp when the remove was added to table state.
@@ -104,7 +104,7 @@ type Remove struct {
 
 // Action that describes the metadata of the table.
 // This is a top-level action in Delta log entries.
-type Metadata struct {
+type ActionMetadata struct {
 	// Unique identifier for this table
 	Id string `json:"path" parquet:"Path"`
 	// User-provided identifier for this table
@@ -125,7 +125,7 @@ type Metadata struct {
 
 // Action used to increase the version of the Delta protocol required to read or write to the
 // table.
-type Protocol struct {
+type ActionProtocol struct {
 	// Minimum version of the Delta read protocol a client must implement to correctly read the
 	// table.
 	MinReaderVersion types.Int `json:"minReaderVersion" parquet:"MinReaderVersion"`
@@ -134,7 +134,7 @@ type Protocol struct {
 	MinWriterVersion types.Int `json:"minWriterVersion" parquet:"MinWriterVersion"`
 }
 
-type Cdc struct {
+type CdcAction struct {
 	Path            *string             `parquet:"Path"`
 	PartitionValues *map[string]*string `parquet:"PartitionValues"`
 	Size            *int64              `parquet:"Size"`
@@ -335,9 +335,9 @@ type CreateOperation struct {
 	// The storage location of the new table
 	Location string `json:"location"`
 	// The min reader and writer protocol versions of the table
-	Protocol Protocol `json:"protocol"`
+	Protocol ActionProtocol `json:"protocol"`
 	// Metadata associated with the new table
-	Metadata DeltaTableMetaData `json:"metadata"`
+	Metadata TableMetadata `json:"metadata"`
 }
 
 // Represents a Delta `StreamingUpdate` operation.
@@ -420,7 +420,7 @@ func decodePath(path string) (string, error) {
 	return decoded, nil
 }
 
-func (x *Add) PathDecoded() error {
+func (x *ActionAdd) PathDecoded() error {
 	p, err := decodePath(x.Path)
 	if err != nil {
 		return err
@@ -429,7 +429,7 @@ func (x *Add) PathDecoded() error {
 	return nil
 }
 
-func (x *Remove) PathDecoded() error {
+func (x *ActionRemove) PathDecoded() error {
 	p, err := decodePath(x.Path)
 	if err != nil {
 		return err
@@ -454,12 +454,12 @@ func convertPointerSlice[T any](input []*T) []T {
 	return output
 }
 
-func (m *Metadata) TryConvertToDeltaTableMetaData() (*DeltaTableMetaData, error) {
+func (m *ActionMetadata) ToTableMetadata() (*TableMetadata, error) {
 	schema, err := m.GetSchema()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema: %w", err)
 	}
-	return &DeltaTableMetaData{
+	return &TableMetadata{
 		Id:               m.Id,
 		Name:             m.Name,
 		Description:      m.Description,
@@ -471,28 +471,10 @@ func (m *Metadata) TryConvertToDeltaTableMetaData() (*DeltaTableMetaData, error)
 	}, nil
 }
 
-func (m *Metadata) GetSchema() (*schema.Schema, error) {
+func (m *ActionMetadata) GetSchema() (*schema.Schema, error) {
 	var s schema.Schema
 	if err := json.Unmarshal([]byte(m.SchemaString), &s); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal schema: %w", err)
 	}
 	return &s, nil
-}
-
-func MetaDataFromDeltaTableMetaData(metadata *DeltaTableMetaData) (*Metadata, error) {
-	schemaString, err := metadata.Schema.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal schema to JSON")
-	}
-
-	return &Metadata{
-		Id:               metadata.Id,
-		Name:             metadata.Name,
-		Description:      metadata.Description,
-		Format:           metadata.Format,
-		SchemaString:     string(schemaString),
-		PartitionColumns: metadata.PartitionColumns,
-		Configuration:    metadata.Configuration,
-		CreatedTime:      metadata.CreatedTime,
-	}, nil
 }

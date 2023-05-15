@@ -18,33 +18,33 @@ var (
 	checkpointSchema string
 )
 
-type DeltaTableState struct {
+type TableState struct {
 	// A remove action should remain in the state of the table as a tombstone until it has expired.
 	// A tombstone expires when the creation timestamp of the delta file exceeds the expiration
-	Tombstones               map[string]Remove // HashSet<action::Remove>
-	Files                    []Add
+	Tombstones               map[string]ActionRemove // HashSet<action::Remove>
+	Files                    []ActionAdd
 	CommitInfos              []map[string]json.RawMessage
 	AppTransactionVersion    map[string]types.Version
 	MinReaderVersion         int32
 	MinWriterVersion         int32
-	CurrentMetadata          *DeltaTableMetaData
+	CurrentMetadata          *TableMetadata
 	TombstoneRetentionMillis types.Long
 	LogRetentionMillis       types.Long
 	EnableExpiredLogCleanup  bool
 	Version                  types.Version
 }
 
-func NewDeltaTableState() *DeltaTableState {
-	return &DeltaTableState{
-		Tombstones:            make(map[string]Remove),
-		Files:                 make([]Add, 0),
+func NewTableState() *TableState {
+	return &TableState{
+		Tombstones:            make(map[string]ActionRemove),
+		Files:                 make([]ActionAdd, 0),
 		CommitInfos:           make([]map[string]json.RawMessage, 0),
 		AppTransactionVersion: make(map[string]int64),
 	}
 }
 
-func NewDeltaTableStateFromActions(actions []Action) (*DeltaTableState, error) {
-	state := NewDeltaTableState()
+func NewTableStateFromActions(actions []Action) (*TableState, error) {
+	state := NewTableState()
 	for _, a := range actions {
 		if err := state.ProcessAction(a, true, true); err != nil {
 			return nil, fmt.Errorf("error processing action: %w", err)
@@ -53,14 +53,14 @@ func NewDeltaTableStateFromActions(actions []Action) (*DeltaTableState, error) {
 	return state, nil
 }
 
-func NewDeltaTableStateFromCommit(table *DeltaTable, committedVersion int64) (*DeltaTableState, error) {
+func NewTableStateFromCommit(table *Table, committedVersion int64) (*TableState, error) {
 	commitUri := storage.CommitUriFromVersion(committedVersion)
 	commitLog, err := table.Storage.GetObj(commitUri)
 	if err != nil {
 		return nil, err
 	}
 
-	state := NewDeltaTableState()
+	state := NewTableState()
 	state.Version = types.Version(committedVersion)
 
 	for _, l := range bytes.Split([]byte("\n"), commitLog) {
@@ -83,10 +83,10 @@ type record struct {
 	SparkSchema Action `parquet:"spark_schema"`
 }
 
-func newDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint) (*DeltaTableState, error) {
+func newTableStateFromCheckPoint(table *Table, checkPoint *CheckPoint) (*TableState, error) {
 	checkPointDataPaths := table.GetCheckPointDataPaths(checkPoint)
 
-	state := NewDeltaTableState()
+	state := NewTableState()
 	for _, p := range checkPointDataPaths {
 		data, err := table.Storage.GetObj(p)
 		if err != nil {
@@ -114,13 +114,10 @@ func newDeltaTableStateFromCheckPoint(table *DeltaTable, checkPoint *CheckPoint)
 	return state, nil
 }
 
-func (state *DeltaTableState) Merge(newState *DeltaTableState, requireTombstones, requireFiles bool) {
+func (state *TableState) Merge(newState *TableState, requireTombstones, requireFiles bool) {
 	// remove deleted files from new state
-	// fmt.Println(len(newState.Tombstones))
-	// fmt.Println(len(newState.Files))
-	// fmt.Println(len(newState.CommitInfos))
 	if len(newState.Tombstones) > 0 {
-		newFiles := make([]Add, 0, len(state.Files))
+		newFiles := make([]ActionAdd, 0, len(state.Files))
 		for _, add := range state.Files {
 
 			if _, isDeleted := newState.Tombstones[add.Path]; !isDeleted {
@@ -167,7 +164,7 @@ func (state *DeltaTableState) Merge(newState *DeltaTableState, requireTombstones
 	}
 }
 
-func (state *DeltaTableState) ProcessAction(action Action, requireTombstones, requireFiles bool) error {
+func (state *TableState) ProcessAction(action Action, requireTombstones, requireFiles bool) error {
 	switch action.GetType() {
 	case ActionTypeAdd:
 		if requireFiles {
@@ -189,7 +186,7 @@ func (state *DeltaTableState) ProcessAction(action Action, requireTombstones, re
 		state.MinReaderVersion = action.Protocol.MinReaderVersion
 		state.MinWriterVersion = action.Protocol.MinWriterVersion
 	case ActionTypeMetadata:
-		md, err := action.MetaData.TryConvertToDeltaTableMetaData()
+		md, err := action.MetaData.ToTableMetadata()
 		if err != nil {
 			return fmt.Errorf("unable to convert action metadata: %w", err)
 		}
