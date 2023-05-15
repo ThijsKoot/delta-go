@@ -8,6 +8,7 @@ import (
 	_ "embed"
 
 	"github.com/thijskoot/delta-go/storage"
+	"github.com/thijskoot/delta-go/types"
 	"github.com/xitongsys/parquet-go-source/buffer"
 	"github.com/xitongsys/parquet-go/reader"
 )
@@ -23,14 +24,14 @@ type DeltaTableState struct {
 	Tombstones               map[string]Remove // HashSet<action::Remove>
 	Files                    []Add
 	CommitInfos              []map[string]json.RawMessage
-	AppTransactionVersion    map[string]DeltaDataTypeVersion
+	AppTransactionVersion    map[string]types.Version
 	MinReaderVersion         int32
 	MinWriterVersion         int32
 	CurrentMetadata          *DeltaTableMetaData
-	TombstoneRetentionMillis DeltaDataTypeLong
-	LogRetentionMillis       DeltaDataTypeLong
+	TombstoneRetentionMillis types.Long
+	LogRetentionMillis       types.Long
 	EnableExpiredLogCleanup  bool
-	Version                  DeltaDataTypeVersion
+	Version                  types.Version
 }
 
 func NewDeltaTableState() *DeltaTableState {
@@ -60,7 +61,7 @@ func NewDeltaTableStateFromCommit(table *DeltaTable, committedVersion int64) (*D
 	}
 
 	state := NewDeltaTableState()
-	state.Version = DeltaDataTypeVersion(committedVersion)
+	state.Version = types.Version(committedVersion)
 
 	for _, l := range bytes.Split([]byte("\n"), commitLog) {
 		var a Action

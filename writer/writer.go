@@ -13,12 +13,13 @@ import (
 	"github.com/apache/arrow/go/v9/parquet/pqarrow"
 	"github.com/thijskoot/delta-go/delta"
 	"github.com/thijskoot/delta-go/storage"
+	"github.com/thijskoot/delta-go/types"
 )
 
 type DeltaWriter[T any] interface {
 	Write(values T) error
 	Flush() ([]delta.Action, error)
-	FlushAndCommit() (delta.DeltaDataTypeVersion, error)
+	FlushAndCommit() (types.Version, error)
 }
 
 type DataWriter struct {

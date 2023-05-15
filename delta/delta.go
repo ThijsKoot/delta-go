@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/thijskoot/delta-go/delta/schema"
 	"github.com/thijskoot/delta-go/storage"
+	"github.com/thijskoot/delta-go/types"
 	"github.com/thijskoot/delta-go/util"
 	"gocloud.dev/blob"
 )
@@ -21,7 +22,7 @@ const DEFAULT_DELTA_MAX_RETRY_COMMIT_ATTEMPTS uint32 = 10_000_000
 // In memory representation of a Delta Table
 type DeltaTable struct {
 	// The version of the table as of the most recent loaded Delta log entry.
-	Version DeltaDataTypeVersion
+	Version types.Version
 	// The URI the DeltaTable was loaded from.
 	TableUri string
 	// the load options used during load
@@ -35,7 +36,7 @@ type DeltaTable struct {
 
 	LastCheckPoint   *CheckPoint
 	LogUri           string
-	VersionTimestamp map[DeltaDataTypeVersion]int64
+	VersionTimestamp map[types.Version]int64
 }
 
 // The next commit that's available from underlying storage
@@ -43,7 +44,7 @@ type DeltaTable struct {
 type PeekCommit struct {
 	// The next commit version and associated actions
 	New struct {
-		Version DeltaDataTypeVersion
+		Version types.Version
 		Actions []Action
 	}
 	// Provided DeltaVersion is up to date
@@ -79,8 +80,8 @@ type PreparedCommit struct {
 
 type CheckPoint struct {
 	// Delta table version
-	Version DeltaDataTypeVersion // 20 digits decimals
-	Size    DeltaDataTypeLong
+	Version types.Version // 20 digits decimals
+	Size    types.Long
 	Parts   *uint32 // 10 digits decimals
 }
 
@@ -98,7 +99,7 @@ type DeltaTableMetaData struct {
 	// An array containing the names of columns by which the data should be partitioned
 	PartitionColumns []string
 	// The time when this metadata action is created, in milliseconds since the Unix epoch
-	CreatedTime *DeltaDataTypeTimestamp
+	CreatedTime *types.Timestamp
 	// table properties
 	Configuration map[string]string
 }
@@ -151,7 +152,7 @@ type DeltaVersion struct {
 	// load the newest version
 	Newest bool
 	// specify the version to load
-	Version *DeltaDataTypeVersion
+	Version *types.Version
 	// specify the timestamp in UTC
 	Timestamp *time.Time
 }
@@ -162,12 +163,12 @@ func NewDefaultDeltaVersion() DeltaVersion {
 	}
 }
 
-type Guid = string
-type DeltaDataTypeDuration = time.Duration
-type DeltaDataTypeLong = int64
-type DeltaDataTypeVersion = DeltaDataTypeLong
-type DeltaDataTypeTimestamp = DeltaDataTypeLong
-type DeltaTableTypeInt = int32
+// type Guid = string
+// type types.Duration = time.Duration
+// type types.Long = int64
+// type types.Version = types.Long
+// type types.Timestamp = types.Long
+// type DeltaTableTypeInt = int32
 
 func OpenTable(tableUri string, bucket *blob.Bucket) (*DeltaTable, error) {
 	// TODO: do we need to create a builder or would DeltaTable suffice, calling Load() on that?
@@ -216,7 +217,7 @@ func WithoutFiles() DeltaTableBuilderOption {
 }
 
 // Sets `version` to the builder
-func WithVersion(version DeltaDataTypeVersion) DeltaTableBuilderOption {
+func WithVersion(version types.Version) DeltaTableBuilderOption {
 	return func(d *DeltaTableBuilder) {
 		d.Options.Version.Version = &version
 	}
@@ -341,7 +342,7 @@ func (d *DeltaTable) UpdateIncremental() error {
 }
 
 // Get the list of actions for the next commit
-func (d *DeltaTable) PeekNextCommit(currentVersion DeltaDataTypeVersion) (*PeekCommit, error) {
+func (d *DeltaTable) PeekNextCommit(currentVersion types.Version) (*PeekCommit, error) {
 	nextVersion := currentVersion + 1
 	commitUri := d.CommitUriFromVersion(nextVersion)
 	commitLogBytes, err := d.Storage.GetObj(commitUri)
@@ -380,7 +381,7 @@ func (d *DeltaTable) PeekNextCommit(currentVersion DeltaDataTypeVersion) (*PeekC
 
 }
 
-func (d *DeltaTable) ApplyActions(newVersion DeltaDataTypeVersion, actions []Action) error {
+func (d *DeltaTable) ApplyActions(newVersion types.Version, actions []Action) error {
 	if d.Version+1 != newVersion {
 		return fmt.Errorf("version mismatch, old version is %v, new version is %v", d.Version, newVersion)
 	}
@@ -396,7 +397,7 @@ func (d *DeltaTable) ApplyActions(newVersion DeltaDataTypeVersion, actions []Act
 	return nil
 }
 
-func (d *DeltaTable) CommitUriFromVersion(version DeltaDataTypeVersion) string {
+func (d *DeltaTable) CommitUriFromVersion(version types.Version) string {
 	v := fmt.Sprintf("%020d.json", version)
 	return d.Storage.JoinPaths(d.LogUri, v)
 }
@@ -443,7 +444,7 @@ func (d *DeltaTable) GetCheckPointDataPaths(checkPoint *CheckPoint) []string {
 // This is low-level transaction API. If user does not want to maintain the commit loop then
 // the `DeltaTransaction.commit` is desired to be used as it handles `try_commit_transaction`
 // with retry logic.
-func (d *DeltaTable) TryCommitTransaction(commit PreparedCommit, version DeltaDataTypeVersion) (DeltaDataTypeVersion, error) {
+func (d *DeltaTable) TryCommitTransaction(commit PreparedCommit, version types.Version) (types.Version, error) {
 	err := d.Storage.RenameObjNoReplace(commit.Uri, d.CommitUriFromVersion(version))
 	if errors.Is(err, &storage.ErrAlreadyExists{}) {
 		return 0, &ErrVersionAlreadyExists{
@@ -538,7 +539,7 @@ func (tx *DeltaTransaction) AddActions(actions []Action) {
 	tx.Actions = append(tx.Actions, actions...)
 }
 
-func (tx *DeltaTransaction) Commit(op *DeltaOperation, appMetadata map[string]json.RawMessage) (DeltaDataTypeVersion, error) {
+func (tx *DeltaTransaction) Commit(op *DeltaOperation, appMetadata map[string]json.RawMessage) (types.Version, error) {
 	preparedCommit, err := tx.PrepareCommit(op, appMetadata)
 	if err != nil {
 		return 0, fmt.Errorf("unable to prepare commit: %w", err)
@@ -611,7 +612,7 @@ func LogEntryFromActions(actions []Action) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-func (tx *DeltaTransaction) TryCommit(commit PreparedCommit) (DeltaDataTypeVersion, error) {
+func (tx *DeltaTransaction) TryCommit(commit PreparedCommit) (types.Version, error) {
 	maxTries := int(tx.Options.MaxRetryCommitAttempts)
 	attempt := 0
 	for {
@@ -634,7 +635,7 @@ func (tx *DeltaTransaction) TryCommit(commit PreparedCommit) (DeltaDataTypeVersi
 
 }
 
-// func (d *DeltaTable) LoadVersion(version DeltaDataTypeVersion) (*DeltaTable, error) {
+// func (d *DeltaTable) LoadVersion(version types.Version) (*DeltaTable, error) {
 //
 // }
 //

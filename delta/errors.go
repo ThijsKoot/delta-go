@@ -1,10 +1,14 @@
 package delta
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/thijskoot/delta-go/types"
+)
 
 type ErrVersionAlreadyExists struct {
 	Inner   error
-	Version DeltaDataTypeVersion
+	Version types.Version
 }
 
 func (e *ErrVersionAlreadyExists) Error() string {

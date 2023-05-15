@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/thijskoot/delta-go/delta/schema"
+	"github.com/thijskoot/delta-go/types"
 	"github.com/thijskoot/delta-go/util"
 )
 
@@ -37,9 +38,9 @@ type Txn struct {
 	// A unique identifier for the application performing the transaction.
 	AppId *string `json:"appId" parquet:"AppId"`
 	// An application-specific numeric identifier for this transaction.
-	Version *DeltaDataTypeVersion `json:"version" parquet:"Version"`
+	Version *types.Version `json:"version" parquet:"Version"`
 	// The time when this transaction action was created in milliseconds since the Unix epoch.
-	LastUpdated *DeltaDataTypeTimestamp `json:"lastUpdated,omitempty" parquet:"LastUpdated"`
+	LastUpdated *types.Timestamp `json:"lastUpdated,omitempty" parquet:"LastUpdated"`
 }
 
 // Delta log action that describes a parquet data file that is part of the table.
@@ -49,7 +50,7 @@ type Add struct {
 	// A map from partition column to value for this file
 	PartitionValues map[string]*string `json:"partitionValues" parquet:"PartitionValues"`
 	// The size of this file in bytes
-	Size DeltaDataTypeLong `json:"size" parquet:"Size"`
+	Size types.Long `json:"size" parquet:"Size"`
 	// Partition values stored in raw parquet struct format. In this struct, the column names
 	// correspond to the partition columns and the values are stored in their corresponding data
 	// type. This is a required field when the table is partitioned and the table property
@@ -59,7 +60,7 @@ type Add struct {
 	// This field is only available in add action records read from checkpoints
 	// PartitionValuesParsed map[string]string `json:"partitionValuesParsed" parquet:"partitionValuesParsed"` // Option<parquet::record::Row>
 	// The time this file was created, as milliseconds since the epoch
-	ModificationTime DeltaDataTypeTimestamp `json:"modificationTime" parquet:"ModificationTime"`
+	ModificationTime types.Timestamp `json:"modificationTime" parquet:"ModificationTime"`
 	// When false the file must already be present in the table or the records in the added file
 	// must be contained in one or more remove actions in the same version
 	//
@@ -84,7 +85,7 @@ type Remove struct {
 	// The path of the file that is removed from the table.
 	Path string `json:"path" parquet:"Path"`
 	// The timestamp when the remove was added to table state.
-	DeletionTimestamp *DeltaDataTypeTimestamp `json:"deletionTimestamp,omitempty" parquet:"DeletionTimestamp"`
+	DeletionTimestamp *types.Timestamp `json:"deletionTimestamp,omitempty" parquet:"DeletionTimestamp"`
 	// Whether data is changed by the remove. A table optimize will report this as false for
 	// example, since it adds and removes files by combining many files into one.
 	DataChange bool `json:"dataChange" parquet:"DataChange"`
@@ -96,7 +97,7 @@ type Remove struct {
 	// A map from partition column to value for this file.
 	PartitionValues map[string]*string `json:"partitionValues" parquet:"PartitionValues"`
 	// Size of this file in bytes
-	Size *DeltaDataTypeLong `json:"size,omitempty" parquet:"Size"`
+	Size *types.Long `json:"size,omitempty" parquet:"Size"`
 	// Map containing metadata about this file
 	Tags *map[string]*string `json:"tags,omitempty" parquet:"Tags"`
 }
@@ -119,7 +120,7 @@ type Metadata struct {
 	// A map containing configuration options for the table
 	Configuration map[string]string `json:"configuration" parquet:"Configuration"`
 	// The time when this metadata action is created, in milliseconds since the Unix epoch
-	CreatedTime *DeltaDataTypeTimestamp `json:"createdTime,omitempty" parquet:"CreatedTime"`
+	CreatedTime *types.Timestamp `json:"createdTime,omitempty" parquet:"CreatedTime"`
 }
 
 // Action used to increase the version of the Delta protocol required to read or write to the
@@ -127,10 +128,10 @@ type Metadata struct {
 type Protocol struct {
 	// Minimum version of the Delta read protocol a client must implement to correctly read the
 	// table.
-	MinReaderVersion DeltaTableTypeInt `json:"minReaderVersion" parquet:"MinReaderVersion"`
+	MinReaderVersion types.Int `json:"minReaderVersion" parquet:"MinReaderVersion"`
 	// Minimum version of the Delta write protocol a client must implement to correctly read the
 	// table.
-	MinWriterVersion DeltaTableTypeInt `json:"minWriterVersion" parquet:"MinWriterVersion"`
+	MinWriterVersion types.Int `json:"minWriterVersion" parquet:"MinWriterVersion"`
 }
 
 type Cdc struct {
@@ -196,7 +197,7 @@ func (cvt *ColumnValueStat) UnmarshalJSON(data []byte) error {
 
 type ColumnCountStat struct {
 	Column map[string]ColumnCountStat
-	Value  *DeltaDataTypeLong
+	Value  *types.Long
 }
 
 func (cct *ColumnCountStat) MarshalJSON() ([]byte, error) {
@@ -216,7 +217,7 @@ func (cct *ColumnCountStat) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if v, ok := raw.(DeltaDataTypeLong); ok {
+	if v, ok := raw.(types.Long); ok {
 		cct.Value = &v
 		return nil
 	}
@@ -231,7 +232,7 @@ func (cct *ColumnCountStat) UnmarshalJSON(data []byte) error {
 // Statistics associated with Add actions contained in the Delta log.
 type Stats struct {
 	// Number of records in the file associated with the log action.
-	NumRecords DeltaDataTypeLong
+	NumRecords types.Long
 	// start of per column stats
 	// Contains a value smaller than all values present in the file for all columns.
 	MinValues map[string]ColumnValueStat
@@ -244,14 +245,14 @@ type Stats struct {
 // File stats parsed from raw parquet format.
 type StatsParsed struct {
 	// Number of records in the file associated with the log action.
-	NumRecords DeltaDataTypeLong
+	NumRecords types.Long
 	// start of per column stats
 	// Contains a value smaller than all values present in the file for all columns.
 	MinValues map[string]interface{} //parquet::record::Field
 	// Contains a value larger than all values present in the file for all columns.
 	MaxValues map[string]interface{}
 	// The number of null values for all columns.
-	NullCount map[string]DeltaDataTypeLong
+	NullCount map[string]types.Long
 }
 
 type ActionType string
@@ -289,9 +290,10 @@ func (a *Action) GetType() ActionType {
 }
 
 type CommitInfo map[string]interface{}
+
 // type CommitInfo struct {
-// 	Version             *DeltaDataTypeVersion   `json:"version" parquet:"Version"`
-// 	Timestamp           *DeltaDataTypeTimestamp `json:"timestamp" parquet:"Timestamp"`
+// 	Version             *types.Version   `json:"version" parquet:"Version"`
+// 	Timestamp           *types.Timestamp `json:"timestamp" parquet:"Timestamp"`
 // 	UserId              *string                 `json:"userId" parquet:"UserId"`
 // 	UserName            *string                 `json:"userName" parquet:"UserName"`
 // 	Operation           *string                 `json:"operation" parquet:"Operation"`
@@ -299,7 +301,7 @@ type CommitInfo map[string]interface{}
 // 	Job                 *Job                    `json:"job" parquet:"Job"`
 // 	Notebook            *Notebook               `json:"notebook" parquet:"Notebook"`
 // 	ClusterId           *string                 `json:"clusterId" parquet:"ClusterId"`
-// 	ReadVersion         *DeltaDataTypeLong      `json:"readVersion" parquet:"ReadVersion"`
+// 	ReadVersion         *types.Long      `json:"readVersion" parquet:"ReadVersion"`
 // 	IsolationLevel      *string                 `json:"isolationLevel" parquet:"IsolationLevel"`
 // 	IsBlindAppend       *bool                   `json:"isBlindAppend" parquet:"IsBlindAppend"`
 // }
