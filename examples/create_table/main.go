@@ -83,11 +83,9 @@ func main() {
 		log.Fatal("unable to write", err)
 	}
 
-	n, err := w.FlushAndCommit()
-	if err != nil {
+	if _, err = w.FlushAndCommit(); err != nil {
 		log.Fatal("unable to flush", err)
 	}
 
-	fmt.Printf("Bytes written: %v\n", n)
 	fmt.Printf("Table version: %v\n", t.Version)
 }

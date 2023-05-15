@@ -68,16 +68,10 @@ func (w *JsonWriter) Flush() ([]delta.Action, error) {
 			return nil, fmt.Errorf("unable to open parquet buffer for stats extraction: %w", err)
 		}
 		meta := preader.MetaData()
-		
+
 		if err := w.Storage.PutObj(storagePath, data); err != nil {
 			return nil, fmt.Errorf("unable to put data: %w", err)
 		}
-
-		// meta, err := metadata.NewFileMetaData(data, nil)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("error parsing parquet metadata: %w", err)
-		//
-		// }
 
 		add, err := createAdd(writer.PartitionValues, writer.NullCounts, path, int64(size), meta)
 		if err != nil {

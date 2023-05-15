@@ -1,9 +1,14 @@
 # delta-go: Delta Lake implementation in Go
 
-Pretty much verbatim port from [delta-rs](https://github.com/delta-io/delta-rs)
+What this is:
+* Pretty much verbatim port from [delta-rs](https://github.com/delta-io/delta-rs)
 
-# TODO functionality
+What this isn't:
+* A repository with a clean commit log
+* Production ready (at all)
 
-- Stats on add
-- Checkpoint creation
-- Deletes
+What this needs:
+* Restructuring
+* User-friendly API
+* TESTS
+* Docs

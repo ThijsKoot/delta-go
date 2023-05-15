@@ -117,7 +117,7 @@ type Metadata struct {
 	// An array containing the names of columns by which the data should be partitioned
 	PartitionColumns []string `json:"partitionColumns" parquet:"PartitionColumns"`
 	// A map containing configuration options for the table
-	Configuration map[string]*string `json:"configuration" parquet:"Configuration"`
+	Configuration map[string]string `json:"configuration" parquet:"Configuration"`
 	// The time when this metadata action is created, in milliseconds since the Unix epoch
 	CreatedTime *DeltaDataTypeTimestamp `json:"createdTime,omitempty" parquet:"CreatedTime"`
 }
@@ -288,20 +288,21 @@ func (a *Action) GetType() ActionType {
 	return ActionTypeInvalid
 }
 
-type CommitInfo struct {
-	Version             *DeltaDataTypeVersion   `json:"version" parquet:"Version"`
-	Timestamp           *DeltaDataTypeTimestamp `json:"timestamp" parquet:"Timestamp"`
-	UserId              *string                 `json:"userId" parquet:"UserId"`
-	UserName            *string                 `json:"userName" parquet:"UserName"`
-	Operation           *string                 `json:"operation" parquet:"Operation"`
-	OperationParameters *map[string]string      `json:"operationParameters" parquet:"OperationParameters"`
-	Job                 *Job                    `json:"job" parquet:"Job"`
-	Notebook            *Notebook               `json:"notebook" parquet:"Notebook"`
-	ClusterId           *string                 `json:"clusterId" parquet:"ClusterId"`
-	ReadVersion         *DeltaDataTypeLong      `json:"readVersion" parquet:"ReadVersion"`
-	IsolationLevel      *string                 `json:"isolationLevel" parquet:"IsolationLevel"`
-	IsBlindAppend       *bool                   `json:"isBlindAppend" parquet:"IsBlindAppend"`
-}
+type CommitInfo map[string]interface{}
+// type CommitInfo struct {
+// 	Version             *DeltaDataTypeVersion   `json:"version" parquet:"Version"`
+// 	Timestamp           *DeltaDataTypeTimestamp `json:"timestamp" parquet:"Timestamp"`
+// 	UserId              *string                 `json:"userId" parquet:"UserId"`
+// 	UserName            *string                 `json:"userName" parquet:"UserName"`
+// 	Operation           *string                 `json:"operation" parquet:"Operation"`
+// 	OperationParameters *map[string]string      `json:"operationParameters" parquet:"OperationParameters"`
+// 	Job                 *Job                    `json:"job" parquet:"Job"`
+// 	Notebook            *Notebook               `json:"notebook" parquet:"Notebook"`
+// 	ClusterId           *string                 `json:"clusterId" parquet:"ClusterId"`
+// 	ReadVersion         *DeltaDataTypeLong      `json:"readVersion" parquet:"ReadVersion"`
+// 	IsolationLevel      *string                 `json:"isolationLevel" parquet:"IsolationLevel"`
+// 	IsBlindAppend       *bool                   `json:"isBlindAppend" parquet:"IsBlindAppend"`
+// }
 
 type Job struct {
 	JobId       *string `json:"jobId" parquet:"jobId"`
@@ -464,7 +465,7 @@ func (m *Metadata) TryConvertToDeltaTableMetaData() (*DeltaTableMetaData, error)
 		Schema:           schema,
 		PartitionColumns: m.PartitionColumns,
 		CreatedTime:      m.CreatedTime,
-		Configuration:    convertPointerMap(m.Configuration),
+		Configuration:    m.Configuration,
 	}, nil
 }
 
@@ -474,4 +475,22 @@ func (m *Metadata) GetSchema() (*schema.Schema, error) {
 		return nil, fmt.Errorf("unable to unmarshal schema: %w", err)
 	}
 	return &s, nil
+}
+
+func MetaDataFromDeltaTableMetaData(metadata *DeltaTableMetaData) (*Metadata, error) {
+	schemaString, err := metadata.Schema.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal schema to JSON")
+	}
+
+	return &Metadata{
+		Id:               metadata.Id,
+		Name:             metadata.Name,
+		Description:      metadata.Description,
+		Format:           metadata.Format,
+		SchemaString:     string(schemaString),
+		PartitionColumns: metadata.PartitionColumns,
+		Configuration:    metadata.Configuration,
+		CreatedTime:      metadata.CreatedTime,
+	}, nil
 }

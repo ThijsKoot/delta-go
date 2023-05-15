@@ -483,6 +483,57 @@ func NewDeltaTransaction(table *DeltaTable, options *DeltaTransactionOptions) De
 	}
 }
 
+func (d *DeltaTable) Create(metadata DeltaTableMetaData, protocol Protocol, commitInfo map[string]string, addActions []Add) error {
+	metaAction, err := MetaDataFromDeltaTableMetaData(&metadata)
+	if err != nil {
+		return fmt.Errorf("error converting metadata to action: %w", err)
+	}
+
+	enrichedCommitInfo := make(util.RawJsonMap)
+	for k, v := range commitInfo {
+		if err := enrichedCommitInfo.Upsert(k, v); err != nil {
+			return fmt.Errorf("error converting commitinfo to JSON")
+		}
+	}
+
+	// FIXME: add version
+	enrichedCommitInfo.MustUpsert("delta-go", "0.0.0")
+	enrichedCommitInfo.MustUpsert("delta-go", time.Now().Format(time.RFC3339))
+
+	actions := []Action{
+		{CommitInfo: &enrichedCommitInfo},
+		{Protocol: &protocol},
+		{MetaData: metaAction},
+	}
+
+	for i := range addActions {
+		a := addActions[i]
+		actions = append(actions, Action{Add: &a})
+	}
+
+	tx := d.CreateTransaction(nil)
+	tx.AddActions(actions)
+
+	preparedCommit, err := tx.PrepareCommit(nil, nil)
+	if err != nil {
+		return fmt.Errorf("error preparing commit: %w", err)
+	}
+
+	committedVersion, err := d.TryCommitTransaction(preparedCommit, 0)
+	if err != nil {
+		return fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	newState, err := NewDeltaTableStateFromCommit(d, committedVersion)
+	if err != nil {
+		return err
+	}
+
+	d.State.Merge(newState, d.Config.RequireTombstones, d.Config.RequireFiles)
+
+	return nil
+}
+
 func (tx *DeltaTransaction) AddActions(actions []Action) {
 	tx.Actions = append(tx.Actions, actions...)
 }

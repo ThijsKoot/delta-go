@@ -7,6 +7,10 @@ import (
 	"gocloud.dev/blob"
 )
 
+func CommitUriFromVersion(version int64) string {
+	return fmt.Sprintf("_delta_log/%020d.json", version)
+}
+
 func NewBackend(bucket *blob.Bucket) (StorageBackend, error) {
 	if bucket == nil {
 		return nil, fmt.Errorf("bucket cannnot be nil")

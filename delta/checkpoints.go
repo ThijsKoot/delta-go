@@ -2,10 +2,10 @@ package delta
 
 type SchemaPath = []string
 
-func (self *CheckPoint) Equal(other *CheckPoint) bool {
-	return self != nil && other != nil &&
-		self.Version == other.Version &&
-		self.Parts == other.Parts &&
-		self.Size == other.Size
+func (c *CheckPoint) Equal(other *CheckPoint) bool {
+	return c != nil && other != nil &&
+		c.Version == other.Version &&
+		c.Parts == other.Parts &&
+		c.Size == other.Size
 
 }

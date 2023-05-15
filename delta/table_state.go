@@ -1,11 +1,13 @@
 package delta
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
 	_ "embed"
 
+	"github.com/thijskoot/delta-go/storage"
 	"github.com/xitongsys/parquet-go-source/buffer"
 	"github.com/xitongsys/parquet-go/reader"
 )
@@ -28,6 +30,7 @@ type DeltaTableState struct {
 	TombstoneRetentionMillis DeltaDataTypeLong
 	LogRetentionMillis       DeltaDataTypeLong
 	EnableExpiredLogCleanup  bool
+	Version                  DeltaDataTypeVersion
 }
 
 func NewDeltaTableState() *DeltaTableState {
@@ -46,6 +49,32 @@ func NewDeltaTableStateFromActions(actions []Action) (*DeltaTableState, error) {
 			return nil, fmt.Errorf("error processing action: %w", err)
 		}
 	}
+	return state, nil
+}
+
+func NewDeltaTableStateFromCommit(table *DeltaTable, committedVersion int64) (*DeltaTableState, error) {
+	commitUri := storage.CommitUriFromVersion(committedVersion)
+	commitLog, err := table.Storage.GetObj(commitUri)
+	if err != nil {
+		return nil, err
+	}
+
+	state := NewDeltaTableState()
+	state.Version = DeltaDataTypeVersion(committedVersion)
+
+	for _, l := range bytes.Split([]byte("\n"), commitLog) {
+		var a Action
+
+		if err := json.Unmarshal(l, &a); err != nil {
+			return nil, fmt.Errorf("error unmarshaling action: %w", err)
+		}
+
+		err := state.ProcessAction(a, table.Config.RequireTombstones, table.Config.RequireFiles)
+		if err != nil {
+			return nil, fmt.Errorf("error processing action: %w", err)
+		}
+	}
+
 	return state, nil
 }
 
