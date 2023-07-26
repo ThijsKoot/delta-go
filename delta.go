@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/thijskoot/delta-go/delta/schema"
+	"github.com/thijskoot/delta-go/internal/util"
+	"github.com/thijskoot/delta-go/schema"
 	"github.com/thijskoot/delta-go/storage"
 	"github.com/thijskoot/delta-go/types"
-	"github.com/thijskoot/delta-go/util"
 	"gocloud.dev/blob"
 )
 
@@ -146,7 +146,7 @@ type TableLoadOptions struct {
 	StorageBackend storage.StorageBackend // Box<dyn StorageBackend>
 	// specify the version we are going to load: a time stamp, a version, or just the newest
 	// available version
-	Version DeltaVersion
+	Version Version
 	// Indicates whether our use case requires tracking tombstones.
 	// This defaults to `true`
 	//
@@ -166,7 +166,7 @@ type TableBuilder struct {
 	Options TableLoadOptions
 }
 
-type DeltaVersion struct {
+type Version struct {
 	// load the newest version
 	Newest bool
 	// specify the version to load
@@ -175,8 +175,8 @@ type DeltaVersion struct {
 	Timestamp *time.Time
 }
 
-func NewDefaultDeltaVersion() DeltaVersion {
-	return DeltaVersion{
+func NewDefaultVersion() Version {
+	return Version{
 		Newest: true,
 	}
 }
@@ -202,7 +202,7 @@ func newTableBuilder(tableUri string, storageBackend storage.StorageBackend, opt
 			StorageBackend:    storageBackend,
 			RequireTombstones: true,
 			RequireFiles:      true,
-			Version:           NewDefaultDeltaVersion(),
+			Version:           NewDefaultVersion(),
 		},
 	}
 	for _, o := range opts {

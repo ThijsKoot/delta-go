@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go"
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/fileblob"
 )

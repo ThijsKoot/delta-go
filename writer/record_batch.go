@@ -5,7 +5,7 @@ import (
 
 	"github.com/apache/arrow/go/v9/arrow"
 	"github.com/apache/arrow/go/v9/parquet/metadata"
-	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go"
 	"github.com/thijskoot/delta-go/storage"
 )
 

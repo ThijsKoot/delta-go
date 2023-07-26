@@ -11,7 +11,7 @@ import (
 	"github.com/apache/arrow/go/v9/parquet"
 	"github.com/apache/arrow/go/v9/parquet/metadata"
 	"github.com/apache/arrow/go/v9/parquet/schema"
-	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go"
 	"golang.org/x/exp/constraints"
 	"k8s.io/utils/pointer"
 )

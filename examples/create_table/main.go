@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/thijskoot/delta-go/delta"
-	"github.com/thijskoot/delta-go/delta/schema"
+	"github.com/thijskoot/delta-go"
+	"github.com/thijskoot/delta-go/schema"
 	"github.com/thijskoot/delta-go/writer"
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/fileblob"

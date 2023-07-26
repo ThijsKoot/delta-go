@@ -11,7 +11,7 @@ import (
 	"github.com/apache/arrow/go/v9/arrow/memory"
 	"github.com/apache/arrow/go/v9/parquet"
 	"github.com/apache/arrow/go/v9/parquet/pqarrow"
-	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go"
 	"github.com/thijskoot/delta-go/storage"
 	"github.com/thijskoot/delta-go/types"
 )
@@ -91,6 +91,7 @@ func (w *DataArrowWriter) WriteValues(partitionColumns []string, schema arrow.Sc
 	//         expected_schema: arrow_schema,
 	//     });
 	// }
+	// schema.Equal(w.)
 
 	if err := w.WriteRecord(partitionColumns, rec); err != nil {
 		// TODO: quarantining bad rows not implemented yet

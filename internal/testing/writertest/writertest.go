@@ -6,8 +6,8 @@ import (
 	"github.com/apache/arrow/go/v10/arrow"
 	"github.com/apache/arrow/go/v10/arrow/array"
 	"github.com/apache/arrow/go/v10/arrow/memory"
-	"github.com/thijskoot/delta-go/delta"
-	"github.com/thijskoot/delta-go/delta/schema"
+	"github.com/thijskoot/delta-go"
+	"github.com/thijskoot/delta-go/schema"
 	"github.com/thijskoot/delta-go/storage"
 	"gocloud.dev/blob/fileblob"
 )

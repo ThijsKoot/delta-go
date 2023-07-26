@@ -13,7 +13,7 @@ import (
 	"github.com/apache/arrow/go/v9/arrow/memory"
 	"github.com/apache/arrow/go/v9/parquet"
 	"github.com/apache/arrow/go/v9/parquet/pqarrow"
-	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go"
 	"github.com/thijskoot/delta-go/writer"
 	"gocloud.dev/blob"
 )
@@ -38,7 +38,6 @@ func main() {
 	check(err)
 	defer output.Close()
 
-
 	for _, x := range table.State.Files {
 		// fmt.Println(*x.Path)
 
@@ -62,7 +61,6 @@ func main() {
 			memory.DefaultAllocator,
 		)
 		check(err)
-
 
 		indices := tbl.Schema().FieldIndices("registrationId")
 		if len(indices) != 1 {

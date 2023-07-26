@@ -1,7 +1,7 @@
 package operations
 
 import (
-	"github.com/thijskoot/delta-go/delta"
+	"github.com/thijskoot/delta-go"
 	"github.com/thijskoot/delta-go/types"
 )
 

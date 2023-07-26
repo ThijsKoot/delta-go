@@ -1,6 +1,6 @@
 package operations
 
-import "github.com/thijskoot/delta-go/delta"
+import "github.com/thijskoot/delta-go"
 
 // Command for writing data into Delta table
 type WriteCommand struct {

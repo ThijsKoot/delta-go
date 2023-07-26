@@ -7,9 +7,9 @@ import (
 	"io"
 	"net/url"
 
-	"github.com/thijskoot/delta-go/delta/schema"
+	"github.com/thijskoot/delta-go/schema"
+	"github.com/thijskoot/delta-go/internal/util"
 	"github.com/thijskoot/delta-go/types"
-	"github.com/thijskoot/delta-go/util"
 )
 
 // Represents an action in the Delta log. The Delta log is an aggregate of all actions performed
